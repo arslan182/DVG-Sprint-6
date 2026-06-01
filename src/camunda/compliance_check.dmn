@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             id="compliance_check"
+             name="Compliance Check"
+             namespace="http://camunda.org/schema/1.0/dmn">
+
+  <decision id="compliance_schwellenwert" name="Compliance Schwellenwert">
+    <decisionTable id="decisionTable_1" hitPolicy="FIRST">
+      <input id="input_waehrung" label="Währung">
+        <inputExpression id="inputExpression_waehrung" typeRef="string">
+          <text>waehrung</text>
+        </inputExpression>
+      </input>
+      <input id="input_betrag" label="Betrag">
+        <inputExpression id="inputExpression_betrag" typeRef="double">
+          <text>betrag</text>
+        </inputExpression>
+      </input>
+      <output id="output_compliance" label="compliance_notwendig" name="compliance_notwendig" typeRef="boolean"/>
+      <output id="output_schwellenwert" label="compliance_schwellenwert" name="compliance_schwellenwert" typeRef="integer"/>
+      <rule id="rule_eur_ja">
+        <inputEntry id="ie_eur_ja_1"><text>"EUR"</text></inputEntry>
+        <inputEntry id="ie_eur_ja_2"><text>&gt; 10000</text></inputEntry>
+        <outputEntry id="oe_eur_ja_1"><text>true</text></outputEntry>
+        <outputEntry id="oe_eur_ja_2"><text>10000</text></outputEntry>
+      </rule>
+      <rule id="rule_eur_nein">
+        <inputEntry id="ie_eur_nein_1"><text>"EUR"</text></inputEntry>
+        <inputEntry id="ie_eur_nein_2"><text>&lt;= 10000</text></inputEntry>
+        <outputEntry id="oe_eur_nein_1"><text>false</text></outputEntry>
+        <outputEntry id="oe_eur_nein_2"><text>10000</text></outputEntry>
+      </rule>
+      <rule id="rule_usd_ja">
+        <inputEntry id="ie_usd_ja_1"><text>"USD"</text></inputEntry>
+        <inputEntry id="ie_usd_ja_2"><text>&gt; 11000</text></inputEntry>
+        <outputEntry id="oe_usd_ja_1"><text>true</text></outputEntry>
+        <outputEntry id="oe_usd_ja_2"><text>11000</text></outputEntry>
+      </rule>
+      <rule id="rule_usd_nein">
+        <inputEntry id="ie_usd_nein_1"><text>"USD"</text></inputEntry>
+        <inputEntry id="ie_usd_nein_2"><text>&lt;= 11000</text></inputEntry>
+        <outputEntry id="oe_usd_nein_1"><text>false</text></outputEntry>
+        <outputEntry id="oe_usd_nein_2"><text>11000</text></outputEntry>
+      </rule>
+      <rule id="rule_chf_ja">
+        <inputEntry id="ie_chf_ja_1"><text>"CHF"</text></inputEntry>
+        <inputEntry id="ie_chf_ja_2"><text>&gt; 10800</text></inputEntry>
+        <outputEntry id="oe_chf_ja_1"><text>true</text></outputEntry>
+        <outputEntry id="oe_chf_ja_2"><text>10800</text></outputEntry>
+      </rule>
+      <rule id="rule_chf_nein">
+        <inputEntry id="ie_chf_nein_1"><text>"CHF"</text></inputEntry>
+        <inputEntry id="ie_chf_nein_2"><text>&lt;= 10800</text></inputEntry>
+        <outputEntry id="oe_chf_nein_1"><text>false</text></outputEntry>
+        <outputEntry id="oe_chf_nein_2"><text>10800</text></outputEntry>
+      </rule>
+      <rule id="rule_gbp_ja">
+        <inputEntry id="ie_gbp_ja_1"><text>"GBP"</text></inputEntry>
+        <inputEntry id="ie_gbp_ja_2"><text>&gt; 8700</text></inputEntry>
+        <outputEntry id="oe_gbp_ja_1"><text>true</text></outputEntry>
+        <outputEntry id="oe_gbp_ja_2"><text>8700</text></outputEntry>
+      </rule>
+      <rule id="rule_gbp_nein">
+        <inputEntry id="ie_gbp_nein_1"><text>"GBP"</text></inputEntry>
+        <inputEntry id="ie_gbp_nein_2"><text>&lt;= 8700</text></inputEntry>
+        <outputEntry id="oe_gbp_nein_1"><text>false</text></outputEntry>
+        <outputEntry id="oe_gbp_nein_2"><text>8700</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
+</definitions>
