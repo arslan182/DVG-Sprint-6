@@ -10,6 +10,24 @@ Sprint 4 baut auf dem Sprint-2-Backend auf und verbindet es mit einem echten BPM
 
 ---
 
+## Architektur
+
+```
+Camunda 8 SaaS (BPMN-Prozess)
+        │
+        │  Zeebe Jobs
+        ▼
+  Python Worker (pyzeebe)
+   ├── auto_workers.py   → automatische Service Tasks
+   ├── grpc_worker.py    → Metadaten per gRPC speichern
+   └── payment_worker.py → Zahlung per RabbitMQ senden
+        │
+        ├──▶ gRPC Server → PostgreSQL Datenbank
+        └──▶ RabbitMQ Queue → Payment Consumer
+```
+
+---
+
 ## Projektstruktur
 
 ```
@@ -36,6 +54,8 @@ Dvg-sprint-4/
 │       └── postgres/docker-compose.yml
 ├── docs/
 │   └── documentation.md
+├── logs/
+│   └── README.md
 ├── start_process.py
 ├── send_correction.py
 ├── .env
@@ -93,22 +113,27 @@ cd extras/compose/RabbitMQ && docker-compose up -d
 
 ## Starten
 
-**Terminal 1** – gRPC Server:
+**Terminal 1** – Docker (PostgreSQL + RabbitMQ):
+```bash
+docker-compose up
+```
+
+**Terminal 2** – gRPC Server:
 ```bash
 python -m src.invoice_metadata.server
 ```
 
-**Terminal 2** – Auto Workers:
+**Terminal 3** – Auto Workers:
 ```bash
 python src/workers/auto_workers.py
 ```
 
-**Terminal 3** – gRPC Worker:
+**Terminal 4** – gRPC Worker:
 ```bash
 python src/workers/grpc_worker.py
 ```
 
-**Terminal 4** – Payment Worker:
+**Terminal 5** – Payment Worker:
 ```bash
 python src/workers/payment_worker.py
 ```
@@ -120,26 +145,38 @@ python start_process.py
 
 ---
 
-## Tests
-
-```bash
-$env:PYTHONPATH = "."; pytest tests/test_workers.py -v
-```
-
----
-
 ## Prozessablauf
 
 Der Prozess heißt **Workflow-Sprint-4** in Camunda 8 SaaS.
 
+### Automatische Tasks
+
+| Task | Worker | Beschreibung |
+|------|--------|--------------|
+| rechnung-erfassen | auto_workers.py | Zeitstempel und Status setzen |
+| automatische-validierung | auto_workers.py | Pflichtfelder prüfen |
+| compliance-check | auto_workers.py | Schwellenwert prüfen |
+| save-invoice-metadata | grpc_worker.py | Metadaten per gRPC speichern |
+| initiate-payment | payment_worker.py | Zahlungsauftrag per RabbitMQ |
+| rechnung-archivieren | auto_workers.py | Archivieren |
+
+### Manuelle Tasks (User Tasks in Camunda Tasklist)
+
+- Metadaten aus Rechnung manuell extrahieren
+- Rechnung Validieren
+- Compliance-Fall manuell prüfen
+- Rechnung freigeben
+- Rechnungsdaten im ERP-System eingeben
+
+### Fehlerbehandlung (Boundary Error Events)
+
+**gRPC nicht erreichbar** → Metadaten manuell speichern  
+**RabbitMQ nicht erreichbar** → Zahlung manuell erfassen
+
+### Prozesswege
+
 **Normalfall (Email):**
 Rechnung eingang → Metadaten manuell extrahieren → Rechnung validieren → Compliance Check → Rechnung freigeben → gRPC speichern → ERP eingeben → RabbitMQ Zahlung → Archivieren
-
-**Fehlerfall gRPC:**
-gRPC Server nicht erreichbar → Boundary Error → Metadaten manuell speichern
-
-**Fehlerfall RabbitMQ:**
-RabbitMQ nicht erreichbar → Boundary Error → Zahlung manuell erfassen
 
 **Compliance-Verstoß:**
 Betrag über Schwellenwert → Compliance manuell prüfen → Freigeben oder Zurückweisen
@@ -157,6 +194,14 @@ Betrag über Schwellenwert → Compliance manuell prüfen → Freigeben oder Zur
 
 ---
 
+## Tests
+
+```bash
+$env:PYTHONPATH = "."; pytest tests/test_workers.py -v
+```
+
+---
+
 ## Korrektur senden
 
 Wenn ein Prozess auf fehlende Informationen wartet:
@@ -164,3 +209,11 @@ Wenn ein Prozess auf fehlende Informationen wartet:
 ```bash
 python send_correction.py R-001
 ```
+
+---
+
+## Bekannte Einschränkungen
+
+- Der Camunda Trial Cluster pausiert automatisch nach längerer Inaktivität.
+- Prozessvariablen die vom Worker gesetzt werden (z.B. `validierung_erfolgreich`, `compliance_notwendig`) sollten beim Start nicht manuell mitgegeben werden.
+- Für `rechnung_freigegeben` wird eine Checkbox verwendet statt Dropdown, da Dropdowns nur Strings speichern.
