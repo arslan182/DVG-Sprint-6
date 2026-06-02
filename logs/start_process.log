@@ -1,0 +1,18 @@
+
+=======================================================
+  Dvg Sprint 4 û Prozess starten
+=======================================================
+
+  Starte Prozess mit folgenden Variablen:
+    eingangskanal: email
+    rechnungs_nummer: R-001
+    lieferant: Mustermann GmbH
+    betrag: 5000
+    waehrung: EUR
+    datum: 2026-06-01
+    rechnung_genehmigt: True
+    informationen_erhalten: True
+
+Prozess gestartet!
+Process Instance Key: 2251799872826437
+Operate: https://bru-2.operate.camunda.io/487e2664-45fe-4a21-9e53-860eddc37e5e/operate/processes/2251799872826437

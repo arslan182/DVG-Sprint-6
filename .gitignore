@@ -21,4 +21,5 @@ env/
 .env 
 
 # Docker
-#*.log 
+
+# Logs (Inhalt nicht pushen, nur leere Dateien als Platzhalter)
