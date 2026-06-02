@@ -11,8 +11,8 @@ Hier sind die Terminal-Ausgaben der Worker und des Servers gespeichert. Die Logs
 | `grpc_worker.log` | Ausgabe von grpc_worker.py (Metadaten per gRPC speichern) |
 | `payment_worker.log` | Ausgabe von payment_worker.py (Zahlungsauftrag per RabbitMQ) |
 | `start_process.log` | Ausgabe von start_process.py (Prozess starten) |
-| `start_process.log` | Ausgabe von start_process.py (Prozess starten) |
 | `tests.log` | Ausgabe der Unit Tests (pytest) |
+| `camunda_operate_screenshot.png` | Screenshot aus Camunda Operate während des Testlaufs |
 
 > **Hinweis:** Docker-Logs werden nicht als Datei gespeichert. Docker schreibt intern seine eigenen Logs, die man mit `docker logs <container-name>` abrufen kann.
 
