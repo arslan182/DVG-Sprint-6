@@ -1,41 +1,49 @@
-# Terminal Logs – Sprint 5
+# Logs – Sprint 5
 
-Hier sind die Terminal-Ausgaben der Worker und des Servers gespeichert. Die Logs zeigen den kompletten Ablauf eines Testlaufs.
+Terminal-Ausgaben der Worker und Server, plus Screenshots aus Camunda und UiPath als Nachweis für den Testlauf.
 
-## Dateien
+## Log-Dateien
 
 | Datei | Inhalt |
 |-------|--------|
-| `server.log` | Ausgabe von invoice_metadata/server.py (gRPC Server) |
-| `auto_workers.log` | Ausgabe von auto_workers.py (rechnung-erfassen, validierung, compliance-check, etc.) |
-| `grpc_worker.log` | Ausgabe von grpc_worker.py (Metadaten per gRPC speichern) |
-| `payment_worker.log` | Ausgabe von payment_worker.py (Zahlungsauftrag per RabbitMQ) |
-| `start_process.log` | Ausgabe von start_process.py (Prozess starten) |
-| `tests.log` | Ausgabe der Unit Tests (pytest) |
-| `camunda_operate_screenshot.png` | Screenshot aus Camunda Operate während des Testlaufs |
+| `server.log` | gRPC Server — Datenbankverbindung und gespeicherte Rechnungen |
+| `auto_workers.log` | Auto Workers — Camunda Tasks inkl. UiPath Bot-Start und Polling |
+| `grpc_worker.log` | gRPC Worker — Metadaten speichern |
+| `payment_worker.log` | Payment Worker — Zahlungsauftrag per RabbitMQ |
+| `start_process.log` | Prozess starten |
+| `tests.log` | Unit Tests (pytest) |
 
-> **Hinweis:** Docker-Logs werden nicht als Datei gespeichert. Docker schreibt intern seine eigenen Logs, die man mit `docker logs <container-name>` abrufen kann.
+## Screenshots
 
-## Log erzeugen
+| Datei | Inhalt |
+|-------|--------|
+| `camunda_prozess_abgeschlossen-sprint-5.png` | Camunda Operate — Prozessinstanz komplett durchgelaufen |
+| `uipath_job_successful-sprint-5.png` | UiPath Orchestrator — Job Successful mit den echten Rechnungsdaten aus Camunda |
+| `uipath_studio_workflow.png` | UiPath Studio — Workflow-Struktur mit Inject JS Script |
+| `uipath_manueller_test.png` | UiPath Orchestrator — manueller Test-Run aus Studio |
+
+> Docker-Logs werden nicht als Datei gespeichert. Mit `docker logs <container-name>` abrufbar.
+
+## Logs erzeugen
 
 ```powershell
-# Docker (Hintergrund, keine Log-Datei nötig)
+# Docker
 docker-compose up -d
 
 # gRPC Server
-& "...\python.exe" -m src.invoice_metadata.server *>&1 | Tee-Object -FilePath logs/server.log
+& "...\python.exe" -u -m src.invoice_metadata.server *>&1 | Tee-Object -FilePath logs/server.log
 
 # Auto Workers
-& "...\python.exe" src/workers/auto_workers.py *>&1 | Tee-Object -FilePath logs/auto_workers.log
+& "...\python.exe" -u src/workers/auto_workers.py *>&1 | Tee-Object -FilePath logs/auto_workers.log
 
 # gRPC Worker
-& "...\python.exe" src/workers/grpc_worker.py *>&1 | Tee-Object -FilePath logs/grpc_worker.log
+& "...\python.exe" -u src/workers/grpc_worker.py *>&1 | Tee-Object -FilePath logs/grpc_worker.log
 
 # Payment Worker
-& "...\python.exe" src/workers/payment_worker.py *>&1 | Tee-Object -FilePath logs/payment_worker.log
+& "...\python.exe" -u src/workers/payment_worker.py *>&1 | Tee-Object -FilePath logs/payment_worker.log
 
 # Prozess starten
-& "...\python.exe" start_process.py *>&1 | Tee-Object -FilePath logs/start_process.log
+& "...\python.exe" -u start_process.py *>&1 | Tee-Object -FilePath logs/start_process.log
 
 # Unit Tests
 $env:PYTHONPATH = "."; & "...\pytest.exe" tests/test_workers.py -v *>&1 | Tee-Object -FilePath logs/tests.log
