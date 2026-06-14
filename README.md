@@ -1,12 +1,12 @@
-# Dvg-Sprint-5 – RPA-Bot für die ERP-Rechnungserfassung
+# Dvg-Sprint-6 – AI Agent für die Extraktion von Rechnungsinformationen
 
 **Hochschule Karlsruhe** | Modul: Digitalisierung von Geschäftsprozessen | Gruppe G11
 
 ---
 
-## Was ist Sprint-5?
+## Was ist Sprint-6?
 
-Sprint 5 baut auf dem Camunda-Workflow aus Sprint 4 auf. Wir haben einen UiPath RPA-Bot gebaut, der den bisher manuellen Schritt "Rechnungsdaten im ERP-System eingeben" automatisiert. Der Bot öffnet das ERP-Frontend im Browser und füllt das Formular selbstständig mit den Rechnungsdaten aus — und als optionales Extra haben wir ihn direkt in den Camunda-Prozess eingebunden, sodass alles automatisch läuft.
+Sprint 6 baut auf dem UiPath RPA-Bot aus Sprint 5 auf. Wir haben einen AI Agent mit **n8n** und **Google Gemini** integriert, der Rechnungsdaten (Metadaten und Rechnungspositionen) automatisch aus einer PDF-Datei extrahiert. Der Mensch prüft das Ergebnis und korrigiert es bei Bedarf — danach läuft der Rest des Prozesses vollautomatisch wie bisher (Validierung → Compliance → UiPath ERP-Eintrag → Zahlung → Archivierung).
 
 Der Bot läuft als Unattended Bot in der UiPath Cloud und wird automatisch vom Python Worker über die UiPath StartJobs API gestartet.
 

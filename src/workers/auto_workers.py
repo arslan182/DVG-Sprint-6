@@ -73,29 +73,6 @@ async def automatische_validierung(**kwargs):
     }
 
 
-async def compliance_check(**kwargs):
-    rechnungs_nummer = kwargs.get("rechnungs_nummer", "UNBEKANNT")
-    betrag           = float(kwargs.get("betrag", 0))
-    waehrung         = kwargs.get("waehrung", "EUR").upper()
-
-    schwellenwerte = {
-        "EUR": 10000,
-        "USD": 11000,
-        "CHF": 10800,
-        "GBP": 8700,
-    }
-
-    schwellenwert        = schwellenwerte.get(waehrung, 10000)
-    compliance_notwendig = betrag > schwellenwert
-
-    print(f"[compliance-check] {rechnungs_nummer}: {betrag} {waehrung} (Schwellenwert: {schwellenwert})")
-
-    return {
-        "compliance_notwendig": compliance_notwendig,
-        "compliance_schwellenwert": schwellenwert,
-    }
-
-
 async def send_request_email(**kwargs):
     rechnungs_nummer   = kwargs.get("rechnungs_nummer", "UNBEKANNT")
     lieferant          = kwargs.get("lieferant", "Unbekannter Lieferant")
@@ -111,11 +88,17 @@ async def send_request_email(**kwargs):
 
 
 async def uipath_erp_queue(**kwargs):
-    rechnungs_nummer = kwargs.get("rechnungs_nummer", "UNBEKANNT")
-    lieferant        = kwargs.get("lieferant", "Unbekannt")
-    betrag           = str(kwargs.get("betrag", "0"))
-    waehrung         = kwargs.get("waehrung", "EUR")
-    eingangskanal    = kwargs.get("eingangskanal", "Email")
+    rechnungs_nummer    = kwargs.get("rechnungs_nummer", "UNBEKANNT")
+    lieferant           = kwargs.get("lieferant", "Unbekannt")
+    betrag              = str(kwargs.get("betrag", "0"))
+    waehrung            = kwargs.get("waehrung", "EUR")
+    datum               = kwargs.get("datum", "")
+    rechnungspositionen = kwargs.get("rechnungspositionen", "[]")  # Sprint 6: JSON-String
+
+    # Fix: Camunda speichert "email"/"edi"/"portal" (klein), UiPath-Bot braucht "Email"/"EDI"/"Portal"
+    eingangskanal_raw = kwargs.get("eingangskanal", "Email")
+    eingangskanal_map = {"email": "Email", "edi": "EDI", "portal": "Portal"}
+    eingangskanal     = eingangskanal_map.get(eingangskanal_raw.lower(), eingangskanal_raw)
 
     print(f"[uipath-erp-queue] Starte für Rechnung {rechnungs_nummer}")
 
@@ -147,11 +130,14 @@ async def uipath_erp_queue(**kwargs):
                     "JobsCount":      1,
                     "Source":         "Manual",
                     "InputArguments": json.dumps({
-                        "rechnungs_nummer": rechnungs_nummer,
-                        "lieferant":        lieferant,
-                        "betrag":           betrag,
-                        "waehrung":         waehrung,
-                        "eingangskanal":    eingangskanal,
+                        # Präfix "in_" weil UiPath Workflow-Argumente so heissen
+                        "in_rechnungs_nummer":    rechnungs_nummer,
+                        "in_lieferant":           lieferant,
+                        "in_betrag":              betrag,
+                        "in_waehrung":            waehrung,
+                        "in_datum":               datum,
+                        "in_eingangskanal":       eingangskanal,
+                        "in_rechnungspositionen": rechnungspositionen,
                     }),
                 }
             },
@@ -161,7 +147,8 @@ async def uipath_erp_queue(**kwargs):
         item_id = start_resp.json().get("value", [{}])[0].get("Id", "gestartet")
         print(f"[uipath-erp-queue] Job gestartet, ID: {item_id}")
 
-        for _ in range(UIPATH_POLL_RETRIES):
+        job_successful = False
+        for attempt in range(UIPATH_POLL_RETRIES):
             await asyncio.sleep(UIPATH_POLL_INTERVAL)
             status_resp = await client.get(
                 f"https://cloud.uipath.com/{UIPATH_ORG}/{UIPATH_TENANT}/orchestrator_/odata/Jobs({item_id})",
@@ -172,12 +159,20 @@ async def uipath_erp_queue(**kwargs):
             )
             if status_resp.status_code == 200:
                 state = status_resp.json().get("State", "")
-                print(f"[uipath-erp-queue] Job Status: {state}")
+                print(f"[uipath-erp-queue] Job Status: {state} (Versuch {attempt + 1}/{UIPATH_POLL_RETRIES})")
                 if state == "Successful":
                     print(f"[uipath-erp-queue] Bot erfolgreich abgeschlossen.")
+                    job_successful = True
                     break
                 if state in ("Faulted", "Stopped"):
                     raise Exception(f"UiPath Job fehlgeschlagen: {state}")
+
+        # Fix: Timeout nach allen Versuchen ohne Erfolg
+        if not job_successful:
+            raise Exception(
+                f"UiPath Job Timeout: nach {UIPATH_POLL_RETRIES} Versuchen "
+                f"({UIPATH_POLL_RETRIES * UIPATH_POLL_INTERVAL}s) kein Erfolg. Job-ID: {item_id}"
+            )
 
     return {
         "uipath_queue_item_id": item_id,
@@ -210,7 +205,7 @@ async def main():
 
     worker.task(task_type="rechnung-erfassen")(rechnung_erfassen)
     worker.task(task_type="automatische-validierung")(automatische_validierung)
-    worker.task(task_type="compliance-check")(compliance_check)
+    # Sprint 6: compliance-check wird jetzt direkt durch DMN in Camunda ausgewertet (zeebe:calledDecision)
     worker.task(task_type="send-request-email")(send_request_email)
     worker.task(task_type="rechnung-archivieren")(rechnung_archivieren)
     worker.task(task_type="uipath-erp-queue", timeout_ms=UIPATH_JOB_TIMEOUT_MS)(uipath_erp_queue)

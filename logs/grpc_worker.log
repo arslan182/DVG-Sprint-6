@@ -4,3 +4,4 @@
 [gRPC Worker] Gespeichert: In DB gespeichert
 [gRPC Worker] Speichere Metadaten: R-001
 [gRPC Worker] Gespeichert: In DB gespeichert
+Failed to activate jobs from the gateway. Exception: ZeebeDeadlineExceeded(grpc_error=AioRpcError(code=StatusCode.DEADLINE_EXCEEDED, details=Deadline Exceeded, debug_error_string=UNKNOWN:Error received from peer  {grpc_status:4, grpc_message:"Deadline Exceeded"})). Retrying in 5 seconds...

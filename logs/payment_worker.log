@@ -4,3 +4,4 @@
 [Payment Worker] Auftrag gesendet: R-001
 [Payment Worker] Zahlung f³r: R-001
 [Payment Worker] Auftrag gesendet: R-001
+Failed to activate jobs from the gateway. Exception: ZeebeDeadlineExceeded(grpc_error=AioRpcError(code=StatusCode.DEADLINE_EXCEEDED, details=Deadline Exceeded, debug_error_string=UNKNOWN:Error received from peer  {grpc_message:"Deadline Exceeded", grpc_status:4})). Retrying in 5 seconds...

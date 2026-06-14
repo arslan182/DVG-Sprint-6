@@ -1,4 +1,18 @@
+"""
+Dvg Sprint 6 – Prozess starten
+
+Verwendung:
+  python start_process.py <pfad_zur_rechnung.pdf>
+
+Beispiele:
+  python start_process.py rechnung.pdf
+  python start_process.py C:/Downloads/RE-2026-001.pdf
+
+Der KI-Agent (n8n + Gemini) extrahiert automatisch alle Rechnungsdaten aus der PDF.
+"""
+
 import os
+import sys
 import asyncio
 from pyzeebe import ZeebeClient, create_camunda_cloud_channel
 from dotenv import load_dotenv
@@ -10,27 +24,50 @@ CAMUNDA_CLIENT_SECRET = os.getenv("CAMUNDA_CLIENT_SECRET")
 CAMUNDA_CLUSTER_ID    = os.getenv("CAMUNDA_CLUSTER_ID")
 CAMUNDA_REGION        = os.getenv("CAMUNDA_REGION")
 
-PROZESS_ID = "Process_workflow_sprint5"
+PROZESS_ID = "Process_workflow_sprint6"
 
-VARIABLEN = {
-    "eingangskanal": "email",
-    "rechnungs_nummer": "R-001",
-    "lieferant": "Mustermann GmbH",
-    "betrag": 5000,
-    "waehrung": "EUR",
-    "datum": "2026-06-01",
-    "rechnung_genehmigt": True,
-    "informationen_erhalten": True,
-}
+
+def get_pdf_pfad() -> str:
+    """PDF-Pfad aus Kommandozeile oder interaktiv abfragen."""
+    if len(sys.argv) >= 2:
+        pfad = sys.argv[1]
+    else:
+        pfad = input("Pfad zur Rechnung (PDF): ").strip().strip('"')
+
+    pfad = os.path.abspath(pfad)
+
+    if not os.path.isfile(pfad):
+        print(f"FEHLER: Datei nicht gefunden: {pfad}")
+        sys.exit(1)
+
+    if not pfad.lower().endswith(".pdf"):
+        print(f"WARNUNG: Datei ist keine PDF: {pfad}")
+
+    return pfad
 
 
 async def main():
+    pdf_pfad = get_pdf_pfad()
+
+    variablen = {
+        # Sprint 6: nur PDF-Pfad nötig — KI extrahiert den Rest
+        "rechnung_pdf_pfad":    pdf_pfad,
+        # Fallback-Werte falls KI-Extraktion fehlschlägt
+        "eingangskanal":        "email",
+        "rechnungs_nummer":     "UNBEKANNT",
+        "lieferant":            "",
+        "betrag":               0,
+        "waehrung":             "EUR",
+        "datum":                "",
+        "rechnung_genehmigt":   True,
+        "informationen_erhalten": True,
+    }
+
     print("\n" + "=" * 55)
-    print("  Dvg Sprint 5 – Prozess starten")
+    print("  Dvg Sprint 6 – Prozess starten")
     print("=" * 55)
-    print(f"\n  Starte Prozess mit folgenden Variablen:")
-    for k, v in VARIABLEN.items():
-        print(f"    {k}: {v}")
+    print(f"\n  PDF:    {pdf_pfad}")
+    print(f"  Prozess: {PROZESS_ID}")
     print()
 
     channel = create_camunda_cloud_channel(
@@ -43,7 +80,7 @@ async def main():
     client = ZeebeClient(channel)
     instance = await client.run_process(
         bpmn_process_id=PROZESS_ID,
-        variables=VARIABLEN,
+        variables=variablen,
     )
 
     print(f"Prozess gestartet!")
