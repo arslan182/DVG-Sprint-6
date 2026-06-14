@@ -1,147 +1,151 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Activity mc:Ignorable="sap sap2010 sads" x:Class="ERP_RechnungsBot.Main"
-  xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities"
-  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-  xmlns:mva="clr-namespace:Microsoft.VisualBasic.Activities;assembly=System.Activities"
-  xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation"
-  xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation"
-  xmlns:sads="http://schemas.microsoft.com/netfx/2010/xaml/activities/debugger"
-  xmlns:ui="clr-namespace:UiPath.UIAutomationNext.Activities;assembly=UiPath.UIAutomationNext.Activities"
-  xmlns:uib="clr-namespace:UiPath.UIAutomationNext.Activities.Browser;assembly=UiPath.UIAutomationNext.Activities"
-  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-
+<Activity mc:Ignorable="sap sap2010" x:Class="Main"
+ xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities"
+ xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+ xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation"
+ xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation"
+ xmlns:scg="clr-namespace:System.Collections.Generic;assembly=System.Private.CoreLib"
+ xmlns:this="clr-namespace:"
+ xmlns:ui="http://schemas.uipath.com/workflow/activities"
+ xmlns:uix="http://schemas.uipath.com/workflow/activities/uix"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <!--
-    Sprint 5 – RPA Bot: Automatische Erfassung von Rechnungsdaten im ERP-System
+    Sprint 6 – RPA Bot: Automatische Erfassung von Rechnungsdaten im ERP-System
     Gruppe G11 | Hochschule Karlsruhe | Modul: Digitalisierung von Geschäftsprozessen
 
-    Workflow:
-      1. Eingabe-Argumente prüfen, ggf. Testdaten setzen
-      2. Microsoft Edge mit ERP-Frontend öffnen
-      3. Alle Felder per JavaScript Injection befüllen (statt TypeInto,
-         da Selektoren auf cloud-gehosteten Seiten instabil waren)
-      4. Submit-Button automatisch klicken
+    Input Arguments (von Camunda Worker):
+      in_rechnungs_nummer    – Rechnungsnummer
+      in_lieferant           – Lieferantenname
+      in_betrag              – Gesamtbetrag (Fallback wenn keine Positionen)
+      in_datum               – Rechnungsdatum (YYYY-MM-DD)
+      in_waehrung            – Währung (EUR/USD/CHF/GBP)
+      in_eingangskanal       – Eingangskanal (Email/EDI/Portal)
+      in_rechnungspositionen – JSON-Array mit Rechnungspositionen (Sprint 6)
 
-    ERP-URL: https://arslan182.github.io/Dvg-sprint-5/erp_frontend.html
+    ERP-URL: https://anhe0003.github.io/this-and-that/ERP_Rechnungserfassung.html
   -->
-
   <x:Members>
     <x:Property Name="in_rechnungs_nummer" Type="InArgument(x:String)" />
-    <x:Property Name="in_lieferant"        Type="InArgument(x:String)" />
-    <x:Property Name="in_betrag"           Type="InArgument(x:String)" />
-    <x:Property Name="in_eingangskanal"    Type="InArgument(x:String)" />
-    <x:Property Name="in_waehrung"         Type="InArgument(x:String)" />
-    <x:Property Name="in_status"           Type="InArgument(x:String)" />
-    <x:Property Name="in_bemerkung"        Type="InArgument(x:String)" />
+    <x:Property Name="in_lieferant" Type="InArgument(x:String)" />
+    <x:Property Name="in_betrag" Type="InArgument(x:String)" />
+    <x:Property Name="in_datum" Type="InArgument(x:String)" />
+    <x:Property Name="in_waehrung" Type="InArgument(x:String)" />
+    <x:Property Name="in_eingangskanal" Type="InArgument(x:String)" />
+    <x:Property Name="in_rechnungspositionen" Type="InArgument(x:String)" />
   </x:Members>
-
-  <sap2010:WorkflowViewState.IdRef>Main</sap2010:WorkflowViewState.IdRef>
-  <mva:VisualBasic.Settings>Assembly references and imported namespaces serialized as XML namespaces</mva:VisualBasic.Settings>
-
-  <Sequence DisplayName="RPA Workflow – ERP Rechnungserfassung" sap:VirtualizedContainerService.HintSize="614,700">
-    <sap2010:WorkflowViewState.IdRef>Sequence_Main</sap2010:WorkflowViewState.IdRef>
-
-    <Sequence.Variables>
-      <Variable x:TypeArguments="x:String" Default="RE-2026-00042"                    Name="v_rechnungs_nummer" />
-      <Variable x:TypeArguments="x:String" Default="Mustermann GmbH"                  Name="v_lieferant" />
-      <Variable x:TypeArguments="x:String" Default="5500"                             Name="v_betrag" />
-      <Variable x:TypeArguments="x:String" Default="Email"                            Name="v_eingangskanal" />
-      <Variable x:TypeArguments="x:String" Default="EUR"                              Name="v_waehrung" />
-      <Variable x:TypeArguments="x:String" Default="OFFEN"                            Name="v_status" />
-      <Variable x:TypeArguments="x:String" Default="Automatisch erfasst via RPA Bot"  Name="v_bemerkung" />
-      <Variable x:TypeArguments="x:String"                                            Name="v_js_script" />
-    </Sequence.Variables>
-
-    <!-- ── Argumente übernehmen (Fallback auf Testwerte) ────────────────── -->
-
-    <Assign DisplayName="Assign: in_rechnungs_nummer" sap:VirtualizedContainerService.HintSize="614,56">
-      <sap2010:WorkflowViewState.IdRef>Assign_1</sap2010:WorkflowViewState.IdRef>
-      <Assign.To>
-        <OutArgument x:TypeArguments="x:String">[v_rechnungs_nummer]</OutArgument>
-      </Assign.To>
-      <Assign.Value>
-        <InArgument x:TypeArguments="x:String">[If(String.IsNullOrEmpty(in_rechnungs_nummer), "RE-2026-00042", in_rechnungs_nummer)]</InArgument>
-      </Assign.Value>
-    </Assign>
-
-    <Assign DisplayName="Assign: in_lieferant" sap:VirtualizedContainerService.HintSize="614,56">
-      <sap2010:WorkflowViewState.IdRef>Assign_2</sap2010:WorkflowViewState.IdRef>
-      <Assign.To>
-        <OutArgument x:TypeArguments="x:String">[v_lieferant]</OutArgument>
-      </Assign.To>
-      <Assign.Value>
-        <InArgument x:TypeArguments="x:String">[If(String.IsNullOrEmpty(in_lieferant), "Mustermann GmbH", in_lieferant)]</InArgument>
-      </Assign.Value>
-    </Assign>
-
-    <Assign DisplayName="Assign: in_betrag" sap:VirtualizedContainerService.HintSize="614,56">
-      <sap2010:WorkflowViewState.IdRef>Assign_3</sap2010:WorkflowViewState.IdRef>
-      <Assign.To>
-        <OutArgument x:TypeArguments="x:String">[v_betrag]</OutArgument>
-      </Assign.To>
-      <Assign.Value>
-        <InArgument x:TypeArguments="x:String">[If(String.IsNullOrEmpty(in_betrag), "5500", in_betrag)]</InArgument>
-      </Assign.Value>
-    </Assign>
-
-    <!-- ── JavaScript-Code als String zusammenbauen ─────────────────────── -->
-
-    <Assign DisplayName="Assign: JavaScript-Code aufbauen" sap:VirtualizedContainerService.HintSize="614,56">
-      <sap2010:WorkflowViewState.IdRef>Assign_JS</sap2010:WorkflowViewState.IdRef>
-      <Assign.To>
-        <OutArgument x:TypeArguments="x:String">[v_js_script]</OutArgument>
-      </Assign.To>
-      <Assign.Value>
-        <InArgument x:TypeArguments="x:String">[
-          "function (element, input) {" &amp; vbLf &amp;
-          "  document.getElementById('rechnungs_nummer').value = '" &amp; v_rechnungs_nummer &amp; "';" &amp; vbLf &amp;
-          "  document.getElementById('lieferant').value = '" &amp; v_lieferant &amp; "';" &amp; vbLf &amp;
-          "  document.getElementById('betrag').value = '" &amp; v_betrag &amp; "';" &amp; vbLf &amp;
-          "  document.getElementById('eingangskanal').value = '" &amp; v_eingangskanal &amp; "';" &amp; vbLf &amp;
-          "  document.getElementById('waehrung').value = '" &amp; v_waehrung &amp; "';" &amp; vbLf &amp;
-          "  document.getElementById('status').value = '" &amp; v_status &amp; "';" &amp; vbLf &amp;
-          "  document.getElementById('bemerkung').value = '" &amp; v_bemerkung &amp; "';" &amp; vbLf &amp;
-          "  document.querySelector('button[type=submit]').click();" &amp; vbLf &amp;
-          "}"
-        ]</InArgument>
-      </Assign.Value>
-    </Assign>
-
-    <!-- ── Browser öffnen und JS ausführen ──────────────────────────────── -->
-
-    <uib:UseApplicationBrowser
-      DisplayName="Use Browser Edge: ERP-System – Rechnungserfassung"
-      BrowserType="Edge"
-      Url="https://arslan182.github.io/Dvg-sprint-5/erp_frontend.html"
-      OpenMode="NewSession"
-      sap:VirtualizedContainerService.HintSize="614,200">
-      <sap2010:WorkflowViewState.IdRef>UseApplicationBrowser_1</sap2010:WorkflowViewState.IdRef>
-
-      <ActivityAction x:TypeArguments="ui:IWindowUiDescriptor">
-        <ActivityAction.Argument>
-          <DelegateInArgument x:TypeArguments="ui:IWindowUiDescriptor" Name="browserWindow" />
-        </ActivityAction.Argument>
-
-        <!--
-          Inject Js Script
-          Ziel: Formular "Neue Rechnung erfassen"
-          Alle Felder werden über ihre HTML-IDs gesetzt; danach Submit geklickt.
-        -->
-        <ui:InjectJsScript
-          DisplayName="Inject Js Script 'Neue Rechnung erfassen – Felder befüllen &amp; absenden'"
-          Script="[v_js_script]"
-          sap:VirtualizedContainerService.HintSize="580,100">
-          <sap2010:WorkflowViewState.IdRef>InjectJsScript_1</sap2010:WorkflowViewState.IdRef>
-          <ui:InjectJsScript.Target>
-            <ui:TargetAnchor>
-              <ui:TargetAnchor.Selector>
-                <x:String>&lt;html app="msedge.exe" title="ERP-System – Rechnungserfassung" /&gt;</x:String>
-              </ui:TargetAnchor.Selector>
-            </ui:TargetAnchor>
-          </ui:InjectJsScript.Target>
-        </ui:InjectJsScript>
-
-      </ActivityAction>
-    </uib:UseApplicationBrowser>
-
+  <this:Main.in_rechnungs_nummer>
+    <InArgument x:TypeArguments="x:String" />
+  </this:Main.in_rechnungs_nummer>
+  <this:Main.in_lieferant>
+    <InArgument x:TypeArguments="x:String" />
+  </this:Main.in_lieferant>
+  <this:Main.in_betrag>
+    <InArgument x:TypeArguments="x:String" />
+  </this:Main.in_betrag>
+  <this:Main.in_datum>
+    <InArgument x:TypeArguments="x:String" />
+  </this:Main.in_datum>
+  <this:Main.in_waehrung>
+    <InArgument x:TypeArguments="x:String" />
+  </this:Main.in_waehrung>
+  <this:Main.in_eingangskanal>
+    <InArgument x:TypeArguments="x:String" />
+  </this:Main.in_eingangskanal>
+  <this:Main.in_rechnungspositionen>
+    <InArgument x:TypeArguments="x:String" />
+  </this:Main.in_rechnungspositionen>
+  <TextExpression.NamespacesForImplementation>
+    <scg:List x:TypeArguments="x:String" Capacity="39">
+      <x:String>System.Activities</x:String>
+      <x:String>UiPath.UIAutomationNext.Enums</x:String>
+      <x:String>System</x:String>
+      <x:String>UiPath.UIAutomationNext</x:String>
+      <x:String>System.ComponentModel</x:String>
+      <x:String>UiPath.UIAutomationNext.Contracts</x:String>
+      <x:String>UiPath.UIAutomationNext.Models</x:String>
+      <x:String>UiPath.Core</x:String>
+      <x:String>System.Runtime.Serialization</x:String>
+      <x:String>UiPath.UIAutomationNext.Activities</x:String>
+      <x:String>UiPath.Platform.ObjectLibrary</x:String>
+      <x:String>UiPath.Platform.SyncObjects</x:String>
+      <x:String>UiPath.Shared.Activities</x:String>
+      <x:String>System.Activities.Statements</x:String>
+      <x:String>System.Collections.Generic</x:String>
+      <x:String>System.Collections</x:String>
+      <x:String>System.Security</x:String>
+      <x:String>UiPath.Web.Activities.JSON.Models</x:String>
+      <x:String>Newtonsoft.Json.Linq</x:String>
+      <x:String>Newtonsoft.Json</x:String>
+      <x:String>System.Dynamic</x:String>
+      <x:String>System.Collections.Specialized</x:String>
+      <x:String>UiPath.Web.Activities</x:String>
+      <x:String>UiPath.Platform.ResourceHandling</x:String>
+      <x:String>System.Reflection</x:String>
+      <x:String>UiPath.Core.Activities</x:String>
+      <x:String>UiPath.UIAutomationNext.Activities.Design.Services.Contracts</x:String>
+      <x:String>System.Collections.ObjectModel</x:String>
+      <x:String>System.Activities.Expressions</x:String>
+      <x:String>System.Activities.Validation</x:String>
+      <x:String>System.Activities.XamlIntegration</x:String>
+      <x:String>Microsoft.VisualBasic</x:String>
+      <x:String>Microsoft.VisualBasic.Activities</x:String>
+      <x:String>System.Data</x:String>
+      <x:String>System.Diagnostics</x:String>
+      <x:String>System.IO</x:String>
+      <x:String>System.Linq</x:String>
+      <x:String>System.Windows.Markup</x:String>
+      <x:String>UiPath.Web.Activities.ViewModels.SWEntities.DeserializeJSONa98202.Bundle</x:String>
+    </scg:List>
+  </TextExpression.NamespacesForImplementation>
+  <TextExpression.ReferencesForImplementation>
+    <scg:List x:TypeArguments="AssemblyReference" Capacity="32">
+      <AssemblyReference>DeserializeJSONa9820.vc1Fi3IOjCM1FKYKL4IbyUy3</AssemblyReference>
+      <AssemblyReference>System.Activities</AssemblyReference>
+      <AssemblyReference>Microsoft.VisualBasic</AssemblyReference>
+      <AssemblyReference>System</AssemblyReference>
+      <AssemblyReference>System.Linq</AssemblyReference>
+      <AssemblyReference>System.Xaml</AssemblyReference>
+      <AssemblyReference>System.Net.Primitives</AssemblyReference>
+      <AssemblyReference>System.Runtime.InteropServices</AssemblyReference>
+      <AssemblyReference>Newtonsoft.Json</AssemblyReference>
+      <AssemblyReference>UiPath.System.Activities</AssemblyReference>
+      <AssemblyReference>System.Private.CoreLib</AssemblyReference>
+      <AssemblyReference>UiPath.UIAutomationNext.Activities</AssemblyReference>
+      <AssemblyReference>System.Drawing.Primitives</AssemblyReference>
+      <AssemblyReference>UiPath.Platform</AssemblyReference>
+      <AssemblyReference>System.ObjectModel</AssemblyReference>
+      <AssemblyReference>UiPath.Web.Activities</AssemblyReference>
+      <AssemblyReference>System.Linq.Expressions</AssemblyReference>
+      <AssemblyReference>System.ComponentModel.TypeConverter</AssemblyReference>
+      <AssemblyReference>System.Runtime</AssemblyReference>
+      <AssemblyReference>netstandard</AssemblyReference>
+      <AssemblyReference>mscorlib</AssemblyReference>
+    </scg:List>
+  </TextExpression.ReferencesForImplementation>
+  <Sequence sap:VirtualizedContainerService.HintSize="356,732" sap2010:WorkflowViewState.IdRef="Sequence_1">
+    <sap:WorkflowViewStateService.ViewState>
+      <scg:Dictionary x:TypeArguments="x:String, x:Object">
+        <x:Boolean x:Key="IsExpanded">True</x:Boolean>
+      </scg:Dictionary>
+    </sap:WorkflowViewStateService.ViewState>
+    <ui:ManualTrigger Result="{x:Null}" DisplayName="Manual Trigger" sap2010:WorkflowViewState.IdRef="ManualTrigger_1" />
+    <uix:NApplicationCard AttachMode="ByInstance" DisplayName="Use Browser Edge: ERP – Rechnungserfassung" HealingAgentBehavior="[UiPath.UIAutomationNext.Enums.NHealingAgentBehavior.Disabled]" sap2010:WorkflowViewState.IdRef="NApplicationCard_1" IsDisplayNameAuto="True" ScopeGuid="98f2f480-ae67-4cab-b80e-348af0efffe3" Version="V2">
+      <uix:NApplicationCard.Body>
+        <ActivityAction x:TypeArguments="x:Object">
+          <ActivityAction.Argument>
+            <DelegateInArgument x:TypeArguments="x:Object" Name="WSSessionData" />
+          </ActivityAction.Argument>
+          <Sequence DisplayName="Do" sap2010:WorkflowViewState.IdRef="Sequence_2">
+            <uix:NInjectJsScript ScriptOutput="{x:Null}" DisplayName="Inject Js Script 'Neue Rechnung erfassen …'" sap2010:WorkflowViewState.IdRef="NInjectJsScript_1" InputParameter="[string.Format(&quot;New With {{{0}  .rechnungs_nummer = in_rechnungs_nummer,{1}  .lieferant = in_lieferant,{2}  .betrag = in_betrag,{3}  .waehrung = in_waehrung,{4}  .datum = in_datum,{5}  .eingangskanal = in_eingangskanal,{6}  .rechnungspositionen = in_rechnungspositionen{7}}}&quot;, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine)]" ScopeIdentifier="98f2f480-ae67-4cab-b80e-348af0efffe3" ScriptCode="[string.Format(&quot;function (element, input) {{{0}  newInvoice();{1}  document.getElementById('invoiceNumber').value = input.rechnungs_nummer || '';{2}  document.getElementById('customerName').value = input.lieferant || '';{3}  document.getElementById('invoiceNotes').value = 'Eingangskanal: ' + (input.eingangskanal || 'Email');{4}  if (input.datum) {{{5}    document.getElementById('invoiceDate').value = input.datum;{6}  }} else {{{7}    document.getElementById('invoiceDate').value = new Date().toISOString().split('T')[0];{8}  }}{9}  var positionen = [];{10}  try {{{11}    if (input.rechnungspositionen) {{{12}      positionen = typeof input.rechnungspositionen === 'string'{13}        ? JSON.parse(input.rechnungspositionen){14}        : input.rechnungspositionen;{15}    }}{16}  }} catch (e) {{ positionen = []; }}{17}  document.getElementById('itemsBody').innerHTML = '';{18}  itemRowCounter = 0;{19}  if (positionen.length &gt; 0) {{{20}    positionen.forEach(function (pos) {{{21}      addItemRow();{22}      var rows = document.querySelectorAll('#itemsBody tr');{23}      var row = rows[rows.length - 1];{24}      row.querySelector('.desc').value = pos.beschreibung || '';{25}      row.querySelector('.qty').value = pos.menge || 1;{26}      row.querySelector('.unit').value = pos.einheit || 'Stk.';{27}      row.querySelector('.price').value = pos.einzelpreis || 0;{28}      row.querySelector('.qty').dispatchEvent(new Event('input', {{ bubbles: true }}));{29}    }});{30}  }} else {{{31}    addItemRow();{32}    var rows = document.querySelectorAll('#itemsBody tr');{33}    var row = rows[rows.length - 1];{34}    row.querySelector('.desc').value = 'Rechnungsbetrag';{35}    row.querySelector('.qty').value = 1;{36}    row.querySelector('.price').value = input.betrag || 0;{37}    row.querySelector('.qty').dispatchEvent(new Event('input', {{ bubbles: true }}));{38}  }}{39}  recalculateTotals();{40}  saveCurrentInvoice();{41}}}&quot;, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine, Environment.NewLine)]" Version="V5">
+              <uix:NInjectJsScript.Target>
+                <uix:TargetAnchorable BrowserURL="anhe0003.github.io/this-and-that/ERP_Rechnungserfassung.html" DesignTimeRectangle="295, 68, 1597, 541" ElementVisibilityArgument="Interactive" FullSelectorArgument="&lt;webctrl tag='DIV' class='panel' idx='2' /&gt;" Guid="f3443e0d-8db0-4c5d-a3bb-e11556f69c9a" InformativeScreenshot="c2cf32342062c260f903407b38dfd480.jpg" ScopeSelectorArgument="&lt;html title='ERP – Rechnungserfassung' app='msedge.exe' /&gt;" SearchSteps="Selector" Version="V6" WaitForReadyArgument="Interactive" />
+              </uix:NInjectJsScript.Target>
+            </uix:NInjectJsScript>
+          </Sequence>
+        </ActivityAction>
+      </uix:NApplicationCard.Body>
+      <uix:NApplicationCard.TargetApp>
+        <uix:TargetApp Area="0, 0, 0, 0" BrowserType="Edge" InformativeScreenshot="77f4e008c238a0c2fc2ed963727586d1.jpg" Selector="&lt;html title='ERP – Rechnungserfassung' app='msedge.exe' /&gt;" Url="https://anhe0003.github.io/this-and-that/ERP_Rechnungserfassung.html" Version="V3" />
+      </uix:NApplicationCard.TargetApp>
+    </uix:NApplicationCard>
   </Sequence>
 </Activity>

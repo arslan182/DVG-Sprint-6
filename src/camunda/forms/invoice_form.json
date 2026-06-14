@@ -41,7 +41,8 @@
       "values": [
         { "label": "EUR", "value": "EUR" },
         { "label": "USD", "value": "USD" },
-        { "label": "CHF", "value": "CHF" }
+        { "label": "CHF", "value": "CHF" },
+        { "label": "GBP", "value": "GBP" }
       ],
       "validate": {
         "required": true
