@@ -1,5 +1,5 @@
 {
-  "name": "Rechnungsextraktion – AI Agent",
+  "name": "Rechnungsextraktion – AI Workflow",
   "nodes": [
     {
       "parameters": {
@@ -10,39 +10,53 @@
           "rawBody": true
         }
       },
-      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "id": "node-webhook",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300]
+      "position": [200, 300]
     },
     {
       "parameters": {
-        "operation": "pdf",
-        "options": {}
+        "jsCode": "// PDF-Bytes (binary) in Base64 umwandeln\nconst binaryData = $input.first().binary?.data;\nif (!binaryData) {\n  // Fallback: Body direkt als Buffer\n  const body = $input.first().json?.body;\n  if (!body) throw new Error('Kein PDF-Inhalt empfangen');\n  return [{ json: { pdfBase64: Buffer.from(body).toString('base64') } }];\n}\nconst base64 = binaryData.data;\nreturn [{ json: { pdfBase64: base64 } }];"
       },
-      "id": "a1b2c3d4-0002-0002-0002-000000000002",
-      "name": "Extract from File",
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1,
-      "position": [480, 300]
+      "id": "node-to-base64",
+      "name": "PDF zu Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
     },
     {
       "parameters": {
-        "modelId": {
-          "__rl": true,
-          "value": "gemini-1.5-flash",
-          "mode": "list",
-          "cachedResultName": "Gemini 1.5 Flash"
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $credentials.googlePalmApi.apiKey }}",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "contents": [
+            {
+              "parts": [
+                {
+                  "text": "Analysiere diese Rechnung und extrahiere alle relevanten Daten als JSON.\n\nExtrahiere genau diese Felder:\n- rechnungs_nummer: Rechnungsnummer (String)\n- lieferant: Name des Lieferanten (String)\n- betrag: Gesamtbetrag als Zahl ohne Währungssymbol (Number)\n- waehrung: Währungscode EUR, USD, CHF oder GBP (String)\n- datum: Rechnungsdatum im Format YYYY-MM-DD (String)\n- eingangskanal: \"Email\" wenn nicht anders angegeben (String)\n- rechnungspositionen: Array mit Positionen, jede mit: beschreibung (String), menge (Number), einheit (String, z.B. Stk.), einzelpreis (Number)\n\nAntworte NUR mit dem JSON-Objekt, ohne Erklärungstext, ohne Markdown-Code-Blöcke."
+                },
+                {
+                  "inline_data": {
+                    "mime_type": "application/pdf",
+                    "data": "={{ $json.pdfBase64 }}"
+                  }
+                }
+              ]
+            }
+          ]
         },
-        "text": "=Analysiere die folgende Rechnung und extrahiere alle relevanten Daten als JSON-Objekt.\n\nExtrahiere folgende Felder:\n- rechnungs_nummer: Rechnungsnummer (String)\n- lieferant: Name des Lieferanten/Ausstellers (String)\n- betrag: Gesamtbetrag als Dezimalzahl ohne Währungssymbol (Number)\n- waehrung: Währungscode (EUR, USD, CHF oder GBP)\n- datum: Rechnungsdatum im Format YYYY-MM-DD (String)\n- eingangskanal: Immer \"Email\" wenn nicht anders angegeben (String)\n- rechnungspositionen: Array mit den einzelnen Positionen, jede mit:\n  - beschreibung: Beschreibung der Position (String)\n  - menge: Menge (Number)\n  - einzelpreis: Einzelpreis (Number)\n  - gesamtpreis: Gesamtpreis dieser Position (Number)\n\nAntworte NUR mit dem JSON-Objekt, kein erklärender Text davor oder danach.\n\nRechnungstext:\n{{ $json.text }}",
         "options": {}
       },
-      "id": "a1b2c3d4-0003-0003-0003-000000000003",
-      "name": "Gemini – Rechnungsdaten extrahieren",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-      "typeVersion": 1,
-      "position": [720, 300],
+      "id": "node-gemini",
+      "name": "Gemini – Rechnung analysieren",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
       "credentials": {
         "googlePalmApi": {
           "id": "GOOGLE_GEMINI_CREDENTIAL_ID",
@@ -52,13 +66,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Gemini-Antwort parsen und validieren\nconst rawText = $input.first().json.text || $input.first().json.content || '';\n\n// JSON aus der Antwort extrahieren (Gemini gibt manchmal Markdown-Code-Blöcke zurück)\nlet jsonText = rawText.trim();\nif (jsonText.startsWith('```')) {\n  jsonText = jsonText.replace(/^```json?\\n?/, '').replace(/\\n?```$/, '');\n}\n\nlet extracted;\ntry {\n  extracted = JSON.parse(jsonText);\n} catch (e) {\n  throw new Error(`Konnte JSON nicht parsen: ${e.message}\\nAntwort: ${rawText.substring(0, 500)}`);\n}\n\n// Validierung und Standardwerte\nconst result = {\n  rechnungs_nummer: extracted.rechnungs_nummer || 'UNBEKANNT',\n  lieferant:        extracted.lieferant || 'UNBEKANNT',\n  betrag:           parseFloat(extracted.betrag) || 0,\n  waehrung:         ['EUR', 'USD', 'CHF', 'GBP'].includes(extracted.waehrung) ? extracted.waehrung : 'EUR',\n  datum:            extracted.datum || new Date().toISOString().split('T')[0],\n  eingangskanal:    extracted.eingangskanal || 'Email',\n  rechnungspositionen: Array.isArray(extracted.rechnungspositionen) ? extracted.rechnungspositionen : [],\n  ki_extraktion_zeitstempel: new Date().toISOString(),\n  ki_extraktion_erfolgreich: true,\n};\n\nreturn [{ json: result }];"
+        "jsCode": "// Gemini-Antwort parsen\nconst response = $input.first().json;\nconst rawText = response?.candidates?.[0]?.content?.parts?.[0]?.text || '';\n\nlet jsonText = rawText.trim();\n// Markdown-Code-Blöcke entfernen falls vorhanden\nif (jsonText.startsWith('```')) {\n  jsonText = jsonText.replace(/^```json?\\n?/, '').replace(/\\n?```$/, '');\n}\n\nlet extracted;\ntry {\n  extracted = JSON.parse(jsonText);\n} catch (e) {\n  throw new Error(`JSON-Parsing fehlgeschlagen: ${e.message}\\nAntwort: ${rawText.substring(0, 300)}`);\n}\n\nconst result = {\n  rechnungs_nummer:       String(extracted.rechnungs_nummer || 'UNBEKANNT'),\n  lieferant:              String(extracted.lieferant || 'UNBEKANNT'),\n  betrag:                 parseFloat(extracted.betrag) || 0,\n  waehrung:               ['EUR','USD','CHF','GBP'].includes(extracted.waehrung) ? extracted.waehrung : 'EUR',\n  datum:                  extracted.datum || new Date().toISOString().split('T')[0],\n  eingangskanal:          extracted.eingangskanal || 'Email',\n  rechnungspositionen:    Array.isArray(extracted.rechnungspositionen) ? extracted.rechnungspositionen : [],\n  ki_extraktion_erfolgreich:  true,\n  ki_extraktion_zeitstempel:  new Date().toISOString(),\n};\n\nreturn [{ json: result }];"
       },
-      "id": "a1b2c3d4-0004-0004-0004-000000000004",
+      "id": "node-parse",
       "name": "JSON parsen & validieren",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [960, 300]
+      "position": [920, 300]
     },
     {
       "parameters": {
@@ -68,91 +82,33 @@
           "responseCode": 200
         }
       },
-      "id": "a1b2c3d4-0005-0005-0005-000000000005",
+      "id": "node-respond-ok",
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1200, 300]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { ki_extraktion_erfolgreich: false, fehler: $json.message } }}",
-        "options": {
-          "responseCode": 500
-        }
-      },
-      "id": "a1b2c3d4-0006-0006-0006-000000000006",
-      "name": "Fehler-Response",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [1200, 500]
+      "position": [1160, 300]
     }
   ],
   "connections": {
     "Webhook": {
-      "main": [
-        [
-          {
-            "node": "Extract from File",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "PDF zu Base64", "type": "main", "index": 0 }]]
     },
-    "Extract from File": {
-      "main": [
-        [
-          {
-            "node": "Gemini – Rechnungsdaten extrahieren",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "PDF zu Base64": {
+      "main": [[{ "node": "Gemini – Rechnung analysieren", "type": "main", "index": 0 }]]
     },
-    "Gemini – Rechnungsdaten extrahieren": {
-      "main": [
-        [
-          {
-            "node": "JSON parsen & validieren",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Gemini – Rechnung analysieren": {
+      "main": [[{ "node": "JSON parsen & validieren", "type": "main", "index": 0 }]]
     },
     "JSON parsen & validieren": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Fehler-Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "sprint6-v1",
   "meta": {
-    "templateCredsSetupCompleted": false,
-    "instanceId": "dvg-gruppe11"
+    "templateCredsSetupCompleted": false
   },
-  "id": "dvg-sprint6-rechnungsextraktion",
-  "tags": [
-    { "createdAt": "2026-06-14", "name": "DVG Sprint 6" }
-  ]
+  "tags": [{ "name": "DVG Sprint 6" }]
 }

@@ -7,7 +7,7 @@
   "components": [
     {
       "type": "text",
-      "text": "## Rechnungsdaten erfassen\nBitte alle Felder ausfüllen."
+      "text": "## KI-extrahierte Rechnungsdaten prüfen\nDie Felder wurden automatisch per KI (n8n + Gemini) befüllt. Bitte prüfen und bei Bedarf korrigieren."
     },
     {
       "type": "textfield",
@@ -69,6 +69,19 @@
       ],
       "validate": {
         "required": true
+      }
+    },
+    {
+      "type": "text",
+      "text": "### Rechnungspositionen\nVon der KI extrahierte Positionen (JSON). Bei Bedarf anpassen."
+    },
+    {
+      "type": "textarea",
+      "key": "rechnungspositionen",
+      "label": "Rechnungspositionen (JSON)",
+      "rows": 6,
+      "validate": {
+        "required": false
       }
     }
   ]
