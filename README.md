@@ -1,31 +1,43 @@
-# Dvg-Sprint-6 – AI Agent für die Extraktion von Rechnungsinformationen
+# Dvg Sprint 6 – AI-gestützte Rechnungsverarbeitung
 
 **Hochschule Karlsruhe** | Modul: Digitalisierung von Geschäftsprozessen | Gruppe G11
 
 ---
 
-## Was ist Sprint-6?
+## Überblick
 
-Sprint 6 baut auf dem UiPath RPA-Bot aus Sprint 5 auf. Wir haben einen AI Agent mit **n8n** und **Google Gemini** integriert, der Rechnungsdaten (Metadaten und Rechnungspositionen) automatisch aus einer PDF-Datei extrahiert. Der Mensch prüft das Ergebnis und korrigiert es bei Bedarf — danach läuft der Rest des Prozesses vollautomatisch wie bisher (Validierung → Compliance → UiPath ERP-Eintrag → Zahlung → Archivierung).
+Sprint 6 erweitert den RPA-Bot aus Sprint 5 um einen AI-Agenten. Statt Rechnungsdaten manuell einzugeben, schickt der Python Worker die PDF-Datei an einen n8n Workflow, der mit **Google Gemini 2.5 Flash** die Daten automatisch extrahiert. Der Mensch prüft das Ergebnis kurz im Camunda Tasklist und gibt es frei — danach läuft alles automatisch weiter.
 
-Der Bot läuft als Unattended Bot in der UiPath Cloud und wird automatisch vom Python Worker über die UiPath StartJobs API gestartet.
+**Neu in Sprint 6:**
+- AI-Extraktion per n8n + Google Gemini (Rechnungsnummer, Lieferant, Betrag, Positionen, …)
+- UiPath Bot trägt jetzt auch einzelne Rechnungspositionen ins ERP ein
+- Compliance-Check läuft direkt über eine DMN-Entscheidungstabelle in Camunda (kein Worker mehr nötig)
 
 ---
 
 ## Architektur
 
 ```
-Camunda 8 SaaS (BPMN-Prozess)
-        │
-        │  Zeebe Jobs
-        ▼
-  Python Worker (pyzeebe)
-   ├── auto_workers.py   → automatische Service Tasks
-   ├── grpc_worker.py    → Metadaten per gRPC speichern
-   └── payment_worker.py → Zahlung per RabbitMQ senden
-        │
-        ├──▶ gRPC Server → PostgreSQL Datenbank
-        └──▶ RabbitMQ Queue → Payment Consumer
+PDF-Datei
+    │
+    ▼
+extraction_worker.py  ──▶  n8n Webhook  ──▶  Google Gemini 2.5 Flash
+                                                       │
+                                               Extrahierte JSON-Daten
+                                                       │
+                                                       ▼
+                                          Camunda 8 SaaS (BPMN-Prozess)
+                                                       │  Zeebe Jobs
+                                                       ▼
+                                            Python Worker (pyzeebe)
+                                             ├── auto_workers.py
+                                             ├── grpc_worker.py
+                                             └── payment_worker.py
+                                                       │
+                                          ┌────────────┴────────────┐
+                                          ▼                         ▼
+                                   gRPC Server               RabbitMQ Queue
+                                   PostgreSQL DB             Payment Consumer
 ```
 
 ---
@@ -33,38 +45,44 @@ Camunda 8 SaaS (BPMN-Prozess)
 ## Projektstruktur
 
 ```
-Dvg-sprint-5/
+Dvg-sprint-6/
 ├── src/
 │   ├── workers/
-│   │   ├── auto_workers.py        # Automatische Camunda Job Worker
-│   │   ├── grpc_worker.py         # Worker für Metadaten per gRPC
-│   │   └── payment_worker.py      # Worker für Zahlung per RabbitMQ
+│   │   ├── extraction_worker.py   # Sendet PDF an n8n, gibt KI-Daten an Camunda zurück
+│   │   ├── auto_workers.py        # Service Tasks (Erfassen, Validieren, UiPath, Archiv)
+│   │   ├── grpc_worker.py         # Speichert Metadaten per gRPC in PostgreSQL
+│   │   └── payment_worker.py      # Schickt Zahlungsauftrag per RabbitMQ
 │   ├── invoice_metadata/
-│   │   ├── server.py              # gRPC Server (aus Sprint 2)
+│   │   ├── server.py              # gRPC Server
 │   │   ├── invoice.proto          # Protobuf Definition
 │   │   ├── invoice_pb2.py
 │   │   └── invoice_pb2_grpc.py
 │   ├── payment_system/
-│   │   └── payment.py             # RabbitMQ Consumer (aus Sprint 2)
+│   │   └── payment.py             # RabbitMQ Consumer
+│   ├── client/
+│   │   └── client.py              # Testclient für gRPC + RabbitMQ
 │   └── camunda/
-│       ├── Workflow-Sprint-4.bpmn # BPMN-Prozess (angepasst für Sprint 5)
-│       └── compliance_check.dmn   # DMN Entscheidungstabelle
-├── tests/
-│   └── test_workers.py
+│       ├── Workflow-Sprint-4.bpmn # BPMN-Prozess
+│       └── compliance_check.dmn   # DMN Compliance-Entscheidungstabelle
+├── n8n/
+│   └── workflow_rechnungsextraktion.json  # n8n Workflow (importieren in n8n)
+├── UiPath_ERP_Bot/
+│   ├── Main.xaml                  # UiPath Workflow
+│   ├── inject_script.js           # JavaScript für ERP-Formular Ausfüllung
+│   └── project.json
 ├── extras/
 │   └── compose/
+│       ├── n8n/docker-compose.yml
 │       ├── RabbitMQ/docker-compose.yml
 │       └── postgres/docker-compose.yml
 ├── docs/
-│   ├── documentation.md           # Sprint 4 Dokumentation
-│   └── sprint5_dokumentation.md   # Sprint 5 Dokumentation (RPA)
-├── logs/
-│   └── README.md
-├── erp_frontend.html              # ERP-Frontend (GitHub Pages deployed)
-├── rechnung_data.json             # Testdaten für den RPA-Bot
-├── start_process.py
-├── send_correction.py
-├── .env
+│   └── screenshots/               # Testdokumentation (Prozess-Screenshots)
+├── tests/
+│   └── test_workers.py
+├── start_process.py               # Prozess starten (PDF-Pfad als Argument)
+├── send_correction.py             # Korrektur-Nachricht an wartenden Prozess senden
+├── test_rechnung.pdf              # Test-PDF für manuelle Tests
+├── .env                           # Secrets (nicht ins Git!)
 ├── requirements.txt
 └── README.md
 ```
@@ -75,7 +93,9 @@ Dvg-sprint-5/
 
 - Python 3.10+
 - Docker
-- Camunda 8 SaaS Account
+- Camunda 8 SaaS Account (kostenlos unter [camunda.io](https://camunda.io))
+- Google AI Studio API-Key ([aistudio.google.com](https://aistudio.google.com))
+- UiPath Cloud Account mit deployed RPA Workflow
 
 ```bash
 pip install -r requirements.txt
@@ -85,28 +105,35 @@ pip install -r requirements.txt
 
 ## Einrichtung
 
-### 1. Umgebungsvariablen
+### 1. `.env` Datei anlegen
 
-`.env` Datei im Projektroot anlegen:
-
-```
+```env
+# Camunda
 CAMUNDA_CLIENT_ID=...
 CAMUNDA_CLIENT_SECRET=...
 CAMUNDA_CLUSTER_ID=...
 CAMUNDA_REGION=bru-2
 
+# gRPC Server (PostgreSQL)
 GRPC_HOST=localhost
 GRPC_PORT=50051
 
+# RabbitMQ
 RABBITMQ_HOST=localhost
 RABBITMQ_USER=user
 RABBITMQ_PASSWORD=password
 
+# PostgreSQL
 DB_HOST=localhost
 DB_NAME=invoice_db
 DB_USER=admin
 DB_PASSWORD=...
 
+# n8n
+N8N_WEBHOOK_URL=http://localhost:5678/webhook/rechnungsextraktion
+N8N_TIMEOUT_SECONDS=60
+
+# UiPath
 UIPATH_CLIENT_ID=...
 UIPATH_CLIENT_SECRET=...
 UIPATH_ORG=gruppe11dvg
@@ -119,7 +146,16 @@ UIPATH_POLL_RETRIES=30
 UIPATH_JOB_TIMEOUT_MS=180000
 ```
 
-### 2. Docker starten
+### 2. n8n Workflow importieren
+
+```bash
+cd extras/compose/n8n
+docker-compose up -d
+```
+
+Dann unter `http://localhost:5678` öffnen, die Datei `n8n/workflow_rechnungsextraktion.json` importieren und den Google Gemini API-Key als Credential hinterlegen (Typ: *Google Gemini(PaLM) Api*). Workflow aktivieren.
+
+### 3. PostgreSQL und RabbitMQ starten
 
 ```bash
 cd extras/compose/postgres && docker-compose up -d
@@ -128,24 +164,26 @@ cd extras/compose/RabbitMQ && docker-compose up -d
 
 ---
 
-## Starten
+## System starten
 
-**Terminal 1** – Docker (PostgreSQL + RabbitMQ):
-```bash
-docker-compose up
-```
+Alle fünf Terminals müssen gleichzeitig laufen:
 
-**Terminal 2** – gRPC Server:
+**Terminal 1** – gRPC Server:
 ```bash
 python -m src.invoice_metadata.server
 ```
 
-**Terminal 3** – Auto Workers:
+**Terminal 2** – AI Extraction Worker:
+```bash
+python src/workers/extraction_worker.py
+```
+
+**Terminal 3** – Auto Workers (Validierung, UiPath, Archivierung):
 ```bash
 python src/workers/auto_workers.py
 ```
 
-**Terminal 4** – gRPC Worker:
+**Terminal 4** – gRPC Worker (Metadaten speichern):
 ```bash
 python src/workers/grpc_worker.py
 ```
@@ -155,7 +193,16 @@ python src/workers/grpc_worker.py
 python src/workers/payment_worker.py
 ```
 
-**Prozess starten:**
+---
+
+## Prozess starten
+
+```bash
+python start_process.py test_rechnung.pdf
+```
+
+Oder ohne Argument — dann wird nach dem Pfad gefragt:
+
 ```bash
 python start_process.py
 ```
@@ -164,43 +211,32 @@ python start_process.py
 
 ## Prozessablauf
 
-Der Prozess heißt **Workflow-Sprint-4** in Camunda 8 SaaS.
+### Service Tasks (automatisch)
 
-### Automatische Tasks
-
-| Task | Worker | Beschreibung |
-|------|--------|--------------|
-| rechnung-erfassen | auto_workers.py | Zeitstempel und Status setzen |
+| Task | Worker | Was passiert |
+|------|--------|-------------|
+| ki-extraktion | extraction_worker.py | PDF → n8n → Gemini → JSON |
+| rechnung-erfassen | auto_workers.py | Zeitstempel setzen |
 | automatische-validierung | auto_workers.py | Pflichtfelder prüfen |
-| compliance-check | auto_workers.py | Schwellenwert prüfen |
+| compliance-check | DMN in Camunda | Schwellenwert automatisch auswerten |
 | uipath-erp-queue | auto_workers.py | UiPath Bot starten (StartJobs API) |
-| save-invoice-metadata | grpc_worker.py | Metadaten per gRPC speichern |
+| save-invoice-metadata | grpc_worker.py | Metadaten in PostgreSQL speichern |
 | initiate-payment | payment_worker.py | Zahlungsauftrag per RabbitMQ |
-| rechnung-archivieren | auto_workers.py | Archivieren |
+| rechnung-archivieren | auto_workers.py | Archivierung abschließen |
 
-### Manuelle Tasks (User Tasks in Camunda Tasklist)
+### User Tasks (manuell im Camunda Tasklist)
 
-- Metadaten aus Rechnung manuell extrahieren
-- Rechnung Validieren
-- Compliance-Fall manuell prüfen
-- Rechnung freigeben
+- **KI-extrahierte Daten prüfen** – extrahierte Felder kontrollieren und korrigieren
+- **Rechnung freigeben** – finale Freigabe vor ERP-Eintrag
+- **Compliance-Fall manuell prüfen** – nur wenn Betrag über Schwellenwert
 
-### Fehlerbehandlung (Boundary Error Events)
+### Fehlerbehandlung
 
-**gRPC nicht erreichbar** → Metadaten manuell speichern  
-**RabbitMQ nicht erreichbar** → Zahlung manuell erfassen
-
-### Prozesswege
-
-**Normalfall (Email):**
-Rechnung eingang → Metadaten manuell extrahieren → Rechnung validieren → Compliance Check → Rechnung freigeben → gRPC speichern → ERP eingeben → RabbitMQ Zahlung → Archivieren
-
-**Compliance-Verstoß:**
-Betrag über Schwellenwert → Compliance manuell prüfen → Freigeben oder Zurückweisen
+Wenn der gRPC Server oder RabbitMQ nicht erreichbar ist, landet der Prozess in einem Boundary Error Event und der Task wird als manueller Schritt im Tasklist angezeigt.
 
 ---
 
-## Compliance-Schwellenwerte
+## Compliance-Schwellenwerte (DMN)
 
 | Währung | Schwellenwert |
 |---------|--------------|
@@ -208,6 +244,51 @@ Betrag über Schwellenwert → Compliance manuell prüfen → Freigeben oder Zur
 | USD     | > 11.000     |
 | CHF     | > 10.800     |
 | GBP     | > 8.700      |
+
+Die Regeln sind in `src/camunda/compliance_check.dmn` definiert und werden direkt in Camunda ausgewertet.
+
+---
+
+## n8n Workflow
+
+Der Workflow hat 7 Nodes:
+
+1. **Webhook** – empfängt die PDF als HTTP POST
+2. **PDF in Binary konvertieren** – wandelt den Body in ein n8n Binary-Objekt um
+3. **PDF Text extrahieren** – liest den Textinhalt der PDF
+4. **Gemini Anfrage bauen** – erstellt den Prompt mit Extraktions-Anweisung
+5. **Gemini – Rechnung analysieren** – ruft `gemini-2.5-flash` via REST API auf
+6. **JSON parsen & validieren** – bereinigt die Gemini-Antwort und validiert die Felder
+7. **Respond to Webhook** – schickt das JSON-Ergebnis zurück an den Python Worker
+
+---
+
+## UiPath RPA Bot
+
+Der Bot läuft als Unattended Cloud Robot in UiPath Orchestrator (Folder: Solution). Er wird automatisch vom Python Worker gestartet, sobald Camunda den Task `uipath-erp-queue` picked.
+
+Der Bot öffnet das ERP-Frontend in Edge und füllt das Formular per JavaScript Injection aus — inklusive einzelner Rechnungspositionen. Das ERP-Frontend ist unter folgendem Link erreichbar:
+
+```
+https://anhe0003.github.io/this-and-that/ERP_Rechnungserfassung.html
+```
+
+**UiPath Konfiguration:**
+- Org: `gruppe11dvg`
+- Tenant: `DefaultTenant`
+- Folder: Solution (ID: 7919369)
+- Process: `RPA Workflow`
+- Robot: Default Robot (Unattended, Cloud Serverless)
+
+---
+
+## Korrektur senden
+
+Wenn ein Prozess auf fehlende Informationen vom Lieferanten wartet:
+
+```bash
+python send_correction.py RE-2026-001
+```
 
 ---
 
@@ -219,42 +300,9 @@ $env:PYTHONPATH = "."; pytest tests/test_workers.py -v
 
 ---
 
-## Korrektur senden
+## Hinweise
 
-Wenn ein Prozess auf fehlende Informationen wartet:
-
-```bash
-python send_correction.py R-001
-```
-
----
-
-## RPA-Bot (Sprint 5)
-
-Der Bot läuft als Unattended Cloud Robot in UiPath Orchestrator (Folder: Solution). Er wird automatisch vom Python Worker über die UiPath StartJobs API gestartet, sobald Camunda den Task `uipath-erp-queue` picked.
-
-Der Bot öffnet das ERP-Frontend in Edge und füllt das Formular per JavaScript Injection aus. Die Rechnungsdaten (Nummer, Lieferant, Betrag, Währung, Eingangskanal) werden als InputArguments vom Camunda Worker übergeben.
-
-Das ERP-Frontend ist erreichbar unter:
-```
-https://arslan182.github.io/Dvg-sprint-5/erp_frontend.html
-```
-
-### UiPath Konfiguration
-
-- **Org:** gruppe11dvg
-- **Tenant:** DefaultTenant
-- **Folder:** Solution (ID: 7919369)
-- **Process:** RPA Workflow (v1.0.2)
-- **Robot:** Default Robot (Unattended, Cloud Serverless)
-- **External App:** Camunda-Connector (OAuth2 Client Credentials)
-- **App Scopes:** OR.Jobs, OR.Jobs.Write, OR.Execution, OR.Execution.Write, OR.Queues, OR.Queues.Read, OR.Queues.Write
-
----
-
-## Bekannte Einschränkungen
-
-- Der Camunda Trial Cluster pausiert automatisch nach längerer Inaktivität — vor dem Testen prüfen ob er noch läuft.
-- Prozessvariablen die vom Worker gesetzt werden (z.B. `validierung_erfolgreich`, `compliance_notwendig`) sollten beim Start nicht manuell mitgegeben werden.
-- Für `rechnung_freigegeben` wird eine Checkbox verwendet statt Dropdown, da Dropdowns nur Strings speichern.
-- Der UiPath Bot läuft in einer Cloud-Session — das ausgefüllte Formular ist nur im UiPath Live Stream sichtbar, nicht im lokalen Browser.
+- Der Camunda Trial Cluster pausiert nach längerer Inaktivität — vor dem Testen im [Camunda Console](https://console.camunda.io) prüfen ob er noch läuft.
+- n8n muss laufen und der Workflow muss aktiviert sein, bevor ein Prozess gestartet wird.
+- Der Google Gemini API-Key hat auf dem Free-Tier ein Rate Limit — zwischen Tests kurz warten wenn 429-Fehler auftreten.
+- Der UiPath Bot läuft in einer Cloud-Session — das ausgefüllte ERP-Formular ist nur über den UiPath Live Stream sichtbar, nicht im lokalen Browser.
