@@ -18,61 +18,62 @@
     },
     {
       "parameters": {
-        "jsCode": "// PDF-Bytes (binary) in Base64 umwandeln\nconst binaryData = $input.first().binary?.data;\nif (!binaryData) {\n  // Fallback: Body direkt als Buffer\n  const body = $input.first().json?.body;\n  if (!body) throw new Error('Kein PDF-Inhalt empfangen');\n  return [{ json: { pdfBase64: Buffer.from(body).toString('base64') } }];\n}\nconst base64 = binaryData.data;\nreturn [{ json: { pdfBase64: base64 } }];"
+        "jsCode": "// Rohe PDF-Bytes aus dem Webhook-Body in n8n Binary-Format konvertieren\nconst item = $input.first();\n\n// Prüfe ob binary schon gesetzt ist (z.B. wenn n8n es automatisch erkennt)\nif (item.binary?.data?.data) {\n  return [item];\n}\n\n// Sonst: rawBody aus json.body konvertieren\nconst body = item.json?.body;\nif (!body) throw new Error('Keine PDF-Daten empfangen');\n\nlet buffer;\nif (Buffer.isBuffer(body)) {\n  buffer = body;\n} else if (typeof body === 'string') {\n  buffer = Buffer.from(body, 'binary');\n} else {\n  buffer = Buffer.from(body);\n}\n\nreturn [{\n  json: {},\n  binary: {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: 'application/pdf',\n      fileExtension: 'pdf',\n      fileName: 'rechnung.pdf'\n    }\n  }\n}];"
       },
-      "id": "node-to-base64",
-      "name": "PDF zu Base64",
+      "id": "node-to-binary",
+      "name": "PDF in Binary konvertieren",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [440, 300]
     },
     {
       "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "data"
+      },
+      "id": "node-extract",
+      "name": "PDF Text extrahieren",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrahierten PDF-Text für Gemini aufbereiten (Text-only, kein Binary)\nconst text = $input.first().json.text || '';\n\nif (!text.trim()) {\n  throw new Error('PDF konnte nicht gelesen werden – kein Text extrahiert');\n}\n\nconst prompt = `Analysiere diese Rechnung und extrahiere alle relevanten Daten als JSON.\\n\\nExtrahiere genau diese Felder:\\n- rechnungs_nummer: Rechnungsnummer (String)\\n- lieferant: Name des Lieferanten (String)\\n- betrag: Gesamtbetrag als Zahl ohne Währungssymbol (Number)\\n- waehrung: Währungscode EUR, USD, CHF oder GBP (String)\\n- datum: Rechnungsdatum im Format YYYY-MM-DD (String)\\n- eingangskanal: \"Email\" wenn nicht anders angegeben (String)\\n- rechnungspositionen: Array mit Positionen, jede mit: beschreibung (String), menge (Number), einheit (String, z.B. Stk.), einzelpreis (Number)\\n\\nAntworte NUR mit dem JSON-Objekt, ohne Erklärungstext, ohne Markdown-Code-Blöcke.\\n\\nRechnungstext:\\n${text}`;\n\nconst requestBody = JSON.stringify({\n  contents: [{ parts: [{ text: prompt }] }]\n});\n\nreturn [{ json: { requestBody } }];"
+      },
+      "id": "node-build",
+      "name": "Gemini Anfrage bauen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
         "method": "POST",
-        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $credentials.googlePalmApi.apiKey }}",
-        "authentication": "none",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
         "sendBody": true,
-        "contentType": "json",
-        "body": {
-          "contents": [
-            {
-              "parts": [
-                {
-                  "text": "Analysiere diese Rechnung und extrahiere alle relevanten Daten als JSON.\n\nExtrahiere genau diese Felder:\n- rechnungs_nummer: Rechnungsnummer (String)\n- lieferant: Name des Lieferanten (String)\n- betrag: Gesamtbetrag als Zahl ohne Währungssymbol (Number)\n- waehrung: Währungscode EUR, USD, CHF oder GBP (String)\n- datum: Rechnungsdatum im Format YYYY-MM-DD (String)\n- eingangskanal: \"Email\" wenn nicht anders angegeben (String)\n- rechnungspositionen: Array mit Positionen, jede mit: beschreibung (String), menge (Number), einheit (String, z.B. Stk.), einzelpreis (Number)\n\nAntworte NUR mit dem JSON-Objekt, ohne Erklärungstext, ohne Markdown-Code-Blöcke."
-                },
-                {
-                  "inline_data": {
-                    "mime_type": "application/pdf",
-                    "data": "={{ $json.pdfBase64 }}"
-                  }
-                }
-              ]
-            }
-          ]
-        },
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
         "options": {}
       },
       "id": "node-gemini",
       "name": "Gemini – Rechnung analysieren",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [680, 300],
-      "credentials": {
-        "googlePalmApi": {
-          "id": "GOOGLE_GEMINI_CREDENTIAL_ID",
-          "name": "Google Gemini API"
-        }
-      }
+      "position": [1160, 300]
     },
     {
       "parameters": {
-        "jsCode": "// Gemini-Antwort parsen\nconst response = $input.first().json;\nconst rawText = response?.candidates?.[0]?.content?.parts?.[0]?.text || '';\n\nlet jsonText = rawText.trim();\n// Markdown-Code-Blöcke entfernen falls vorhanden\nif (jsonText.startsWith('```')) {\n  jsonText = jsonText.replace(/^```json?\\n?/, '').replace(/\\n?```$/, '');\n}\n\nlet extracted;\ntry {\n  extracted = JSON.parse(jsonText);\n} catch (e) {\n  throw new Error(`JSON-Parsing fehlgeschlagen: ${e.message}\\nAntwort: ${rawText.substring(0, 300)}`);\n}\n\nconst result = {\n  rechnungs_nummer:       String(extracted.rechnungs_nummer || 'UNBEKANNT'),\n  lieferant:              String(extracted.lieferant || 'UNBEKANNT'),\n  betrag:                 parseFloat(extracted.betrag) || 0,\n  waehrung:               ['EUR','USD','CHF','GBP'].includes(extracted.waehrung) ? extracted.waehrung : 'EUR',\n  datum:                  extracted.datum || new Date().toISOString().split('T')[0],\n  eingangskanal:          extracted.eingangskanal || 'Email',\n  rechnungspositionen:    Array.isArray(extracted.rechnungspositionen) ? extracted.rechnungspositionen : [],\n  ki_extraktion_erfolgreich:  true,\n  ki_extraktion_zeitstempel:  new Date().toISOString(),\n};\n\nreturn [{ json: result }];"
+        "jsCode": "// Gemini-Antwort parsen\nconst response = $input.first().json;\nconst rawText = response?.candidates?.[0]?.content?.parts?.[0]?.text || '';\n\nlet jsonText = rawText.trim();\nif (jsonText.startsWith('```')) {\n  jsonText = jsonText.replace(/^```json?\\n?/, '').replace(/\\n?```$/, '');\n}\n\nlet extracted;\ntry {\n  extracted = JSON.parse(jsonText);\n} catch (e) {\n  throw new Error(`JSON-Parsing fehlgeschlagen: ${e.message}\\nAntwort: ${rawText.substring(0, 300)}`);\n}\n\nconst result = {\n  rechnungs_nummer: String(extracted.rechnungs_nummer || 'UNBEKANNT'),\n  lieferant: String(extracted.lieferant || 'UNBEKANNT'),\n  betrag: parseFloat(extracted.betrag) || 0,\n  waehrung: ['EUR','USD','CHF','GBP'].includes(extracted.waehrung) ? extracted.waehrung : 'EUR',\n  datum: extracted.datum || new Date().toISOString().split('T')[0],\n  eingangskanal: extracted.eingangskanal || 'Email',\n  rechnungspositionen: Array.isArray(extracted.rechnungspositionen) ? extracted.rechnungspositionen : [],\n  ki_extraktion_erfolgreich: true,\n  ki_extraktion_zeitstempel: new Date().toISOString(),\n};\n\nreturn [{ json: result }];"
       },
       "id": "node-parse",
       "name": "JSON parsen & validieren",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [920, 300]
+      "position": [1400, 300]
     },
     {
       "parameters": {
@@ -86,14 +87,20 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1160, 300]
+      "position": [1640, 300]
     }
   ],
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "PDF zu Base64", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "PDF in Binary konvertieren", "type": "main", "index": 0 }]]
     },
-    "PDF zu Base64": {
+    "PDF in Binary konvertieren": {
+      "main": [[{ "node": "PDF Text extrahieren", "type": "main", "index": 0 }]]
+    },
+    "PDF Text extrahieren": {
+      "main": [[{ "node": "Gemini Anfrage bauen", "type": "main", "index": 0 }]]
+    },
+    "Gemini Anfrage bauen": {
       "main": [[{ "node": "Gemini – Rechnung analysieren", "type": "main", "index": 0 }]]
     },
     "Gemini – Rechnung analysieren": {

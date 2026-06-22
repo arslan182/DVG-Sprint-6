@@ -1,0 +1,3 @@
+[Extraction Worker] Cluster:      487e2664-45fe-4a21-9e53-860eddc37e5e
+[Extraction Worker] n8n Webhook:  http://localhost:5678/webhook/rechnungsextraktion
+[Extraction Worker] Wartet auf Jobs...

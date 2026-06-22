@@ -1,7 +1,2 @@
 [Payment Worker] Cluster: 487e2664-45fe-4a21-9e53-860eddc37e5e
 [Payment Worker] Wartet auf Jobs...
-[Payment Worker] Zahlung f³r: R-001
-[Payment Worker] Auftrag gesendet: R-001
-[Payment Worker] Zahlung f³r: R-001
-[Payment Worker] Auftrag gesendet: R-001
-Failed to activate jobs from the gateway. Exception: ZeebeDeadlineExceeded(grpc_error=AioRpcError(code=StatusCode.DEADLINE_EXCEEDED, details=Deadline Exceeded, debug_error_string=UNKNOWN:Error received from peer  {grpc_message:"Deadline Exceeded", grpc_status:4})). Retrying in 5 seconds...

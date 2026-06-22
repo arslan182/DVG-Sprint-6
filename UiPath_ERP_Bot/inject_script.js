@@ -11,8 +11,8 @@
 
 function (element, input) {
 
-  // 1. Neue Rechnung starten (setzt Formular zurück)
-  newInvoice();
+  // 1. Neue Rechnung starten (setzt Formular zurück, falls Funktion vorhanden)
+  if (typeof newInvoice === 'function') { newInvoice(); }
 
   // 2. Stammdaten befüllen
   document.getElementById('invoiceNumber').value  = input.rechnungs_nummer || '';
@@ -42,10 +42,24 @@ function (element, input) {
   document.getElementById('itemsBody').innerHTML = '';
   itemRowCounter = 0;
 
-  if (positionen.length > 0) {
-    // Sprint 6: KI-extrahierte Positionen eintragen
-    positionen.forEach(function (pos) {
+  function safeAddItemRow() {
+    if (typeof addItemRow === 'function') {
       addItemRow();
+    } else {
+      var tbody = document.getElementById('itemsBody');
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td><input class="desc" type="text"></td>' +
+                     '<td><input class="qty" type="number" value="1"></td>' +
+                     '<td><input class="unit" type="text" value="Stk."></td>' +
+                     '<td><input class="price" type="number" value="0"></td>' +
+                     '<td><span class="total">0</span></td>';
+      tbody.appendChild(tr);
+    }
+  }
+
+  if (positionen.length > 0) {
+    positionen.forEach(function (pos) {
+      safeAddItemRow();
       var rows = document.querySelectorAll('#itemsBody tr');
       var row  = rows[rows.length - 1];
       row.querySelector('.desc').value  = pos.beschreibung || '';
@@ -55,8 +69,7 @@ function (element, input) {
       row.querySelector('.qty').dispatchEvent(new Event('input', { bubbles: true }));
     });
   } else {
-    // Fallback (Sprint 5): eine Position mit dem Gesamtbetrag
-    addItemRow();
+    safeAddItemRow();
     var rows = document.querySelectorAll('#itemsBody tr');
     var row  = rows[rows.length - 1];
     row.querySelector('.desc').value  = 'Rechnungsbetrag';
@@ -65,9 +78,6 @@ function (element, input) {
     row.querySelector('.qty').dispatchEvent(new Event('input', { bubbles: true }));
   }
 
-  // 4. Summen neu berechnen
-  recalculateTotals();
-
-  // 5. Rechnung speichern (LocalStorage)
-  saveCurrentInvoice();
+  if (typeof recalculateTotals === 'function') { recalculateTotals(); }
+  if (typeof saveCurrentInvoice === 'function') { saveCurrentInvoice(); }
 }
