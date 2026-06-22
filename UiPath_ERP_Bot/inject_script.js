@@ -1,32 +1,32 @@
-// UiPath Inject Js Script – ERP Rechnungserfassung
-// Ziel: https://anhe0003.github.io/this-and-that/ERP_Rechnungserfassung.html
+// UiPath Inject JS Script – ERP Rechnungserfassung
+// Target: https://anhe0003.github.io/this-and-that/ERP_Rechnungserfassung.html
 //
-// Input Arguments vom Camunda Worker:
-//   input.rechnungs_nummer    → invoiceNumber
-//   input.lieferant           → customerName
+// Called by UiPath with invoice data from Camunda:
+//   input.rechnungs_nummer    → invoiceNumber field
+//   input.lieferant           → customerName field
 //   input.datum               → invoiceDate (YYYY-MM-DD)
-//   input.eingangskanal       → invoiceNotes
-//   input.betrag              → Fallback-Betrag wenn keine Positionen
-//   input.rechnungspositionen → JSON-Array mit Positionen (Sprint 6)
+//   input.eingangskanal       → invoiceNotes field
+//   input.betrag              → fallback total when no line items are present
+//   input.rechnungspositionen → JSON array of line items
 
 function (element, input) {
 
-  // 1. Neue Rechnung starten (setzt Formular zurück, falls Funktion vorhanden)
+  // Reset the form if the ERP page provides a newInvoice function
   if (typeof newInvoice === 'function') { newInvoice(); }
 
-  // 2. Stammdaten befüllen
+  // Fill in the invoice header fields
   document.getElementById('invoiceNumber').value  = input.rechnungs_nummer || '';
   document.getElementById('customerName').value   = input.lieferant || '';
   document.getElementById('invoiceNotes').value   = 'Eingangskanal: ' + (input.eingangskanal || 'Email');
 
-  // Datum: Camunda liefert "YYYY-MM-DD" → passt direkt für type="date"
+  // Date arrives as YYYY-MM-DD from Camunda, which matches the date input format
   if (input.datum) {
     document.getElementById('invoiceDate').value = input.datum;
   } else {
     document.getElementById('invoiceDate').value = new Date().toISOString().split('T')[0];
   }
 
-  // 3. Rechnungspositionen hinzufügen
+  // Parse line items — the value may arrive as a JSON string or already as an array
   var positionen = [];
   try {
     if (input.rechnungspositionen) {
@@ -38,10 +38,11 @@ function (element, input) {
     positionen = [];
   }
 
-  // Bestehende Positionen-Zeilen entfernen
+  // Clear existing rows before filling in new data
   document.getElementById('itemsBody').innerHTML = '';
   itemRowCounter = 0;
 
+  // Use the ERP's addItemRow if available, otherwise build the row manually
   function safeAddItemRow() {
     if (typeof addItemRow === 'function') {
       addItemRow();

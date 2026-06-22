@@ -26,6 +26,7 @@ UIPATH_JOB_TIMEOUT_MS = int(os.getenv("UIPATH_JOB_TIMEOUT_MS", "180000"))
 
 
 async def rechnung_erfassen(**kwargs):
+    """Marks the invoice as received and records the timestamp."""
     rechnungs_nummer = kwargs.get("rechnungs_nummer", "UNBEKANNT")
     eingangskanal    = kwargs.get("eingangskanal", "unbekannt")
 
@@ -38,6 +39,7 @@ async def rechnung_erfassen(**kwargs):
 
 
 async def automatische_validierung(**kwargs):
+    """Checks that all required invoice fields are present and valid."""
     rechnungs_nummer = kwargs.get("rechnungs_nummer", "")
     lieferant        = kwargs.get("lieferant", "")
     betrag           = kwargs.get("betrag", None)
@@ -74,6 +76,7 @@ async def automatische_validierung(**kwargs):
 
 
 async def send_request_email(**kwargs):
+    """Sends an email to the supplier requesting missing invoice information."""
     rechnungs_nummer   = kwargs.get("rechnungs_nummer", "UNBEKANNT")
     lieferant          = kwargs.get("lieferant", "Unbekannter Lieferant")
     validierung_fehler = kwargs.get("validierung_fehler", "Fehlende Angaben")
@@ -88,14 +91,19 @@ async def send_request_email(**kwargs):
 
 
 async def uipath_erp_queue(**kwargs):
+    """Starts a UiPath job that enters the invoice into the ERP system.
+
+    Authenticates with UiPath Cloud, starts the RPA job with the invoice data,
+    and polls for completion. Raises an exception on failure or timeout.
+    """
     rechnungs_nummer    = kwargs.get("rechnungs_nummer", "UNBEKANNT")
     lieferant           = kwargs.get("lieferant", "Unbekannt")
     betrag              = str(kwargs.get("betrag", "0"))
     waehrung            = kwargs.get("waehrung", "EUR")
     datum               = kwargs.get("datum", "")
-    rechnungspositionen = kwargs.get("rechnungspositionen", "[]")  # Sprint 6: JSON-String
+    rechnungspositionen = kwargs.get("rechnungspositionen", "[]")  # JSON-encoded list of line items
 
-    # Fix: Camunda speichert "email"/"edi"/"portal" (klein), UiPath-Bot braucht "Email"/"EDI"/"Portal"
+    # Camunda stores channel names in lowercase; UiPath expects capitalized values
     eingangskanal_raw = kwargs.get("eingangskanal", "Email")
     eingangskanal_map = {"email": "Email", "edi": "EDI", "portal": "Portal"}
     eingangskanal     = eingangskanal_map.get(eingangskanal_raw.lower(), eingangskanal_raw)
@@ -130,7 +138,7 @@ async def uipath_erp_queue(**kwargs):
                     "JobsCount":      1,
                     "Source":         "Manual",
                     "InputArguments": json.dumps({
-                        # Präfix "in_" weil UiPath Workflow-Argumente so heissen
+                        # UiPath workflow input arguments use the "in_" prefix by convention
                         "in_rechnungs_nummer":    rechnungs_nummer,
                         "in_lieferant":           lieferant,
                         "in_betrag":              betrag,
@@ -167,7 +175,6 @@ async def uipath_erp_queue(**kwargs):
                 if state in ("Faulted", "Stopped"):
                     raise Exception(f"UiPath Job fehlgeschlagen: {state}")
 
-        # Fix: Timeout nach allen Versuchen ohne Erfolg
         if not job_successful:
             raise Exception(
                 f"UiPath Job Timeout: nach {UIPATH_POLL_RETRIES} Versuchen "
@@ -182,6 +189,7 @@ async def uipath_erp_queue(**kwargs):
 
 
 async def rechnung_archivieren(**kwargs):
+    """Archives the invoice after the process has completed successfully."""
     rechnungs_nummer = kwargs.get("rechnungs_nummer", "UNBEKANNT")
     betrag           = kwargs.get("betrag", 0)
     waehrung         = kwargs.get("waehrung", "EUR")
@@ -195,6 +203,7 @@ async def rechnung_archivieren(**kwargs):
 
 
 async def main():
+    """Connects to Camunda and registers all worker tasks."""
     channel = create_camunda_cloud_channel(
         client_id=CAMUNDA_CLIENT_ID,
         client_secret=CAMUNDA_CLIENT_SECRET,
@@ -205,7 +214,7 @@ async def main():
 
     worker.task(task_type="rechnung-erfassen")(rechnung_erfassen)
     worker.task(task_type="automatische-validierung")(automatische_validierung)
-    # Sprint 6: compliance-check wird jetzt direkt durch DMN in Camunda ausgewertet (zeebe:calledDecision)
+    # Compliance check is evaluated by the DMN decision table directly in Camunda
     worker.task(task_type="send-request-email")(send_request_email)
     worker.task(task_type="rechnung-archivieren")(rechnung_archivieren)
     worker.task(task_type="uipath-erp-queue", timeout_ms=UIPATH_JOB_TIMEOUT_MS)(uipath_erp_queue)

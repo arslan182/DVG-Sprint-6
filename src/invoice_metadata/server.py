@@ -16,6 +16,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "secretpassword")
 
 class RechnungService(invoice_pb2_grpc.RechnungServiceServicer):
     def __init__(self):
+        """Opens the database connection and ensures the invoices table exists."""
         self.conn = psycopg2.connect(
             host=DB_HOST,
             database=DB_NAME,
@@ -25,6 +26,7 @@ class RechnungService(invoice_pb2_grpc.RechnungServiceServicer):
         self._create_table()
 
     def _create_table(self):
+        """Creates the invoices table if it doesn't exist yet."""
         with self.conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS invoices (
@@ -39,6 +41,7 @@ class RechnungService(invoice_pb2_grpc.RechnungServiceServicer):
             self.conn.commit()
 
     def SpeichereMetadaten(self, request, context):
+        """Inserts or updates an invoice record. Returns success/failure in the response."""
         status_name = invoice_pb2.RechnungsStatus.Name(request.status)
 
         try:
@@ -67,6 +70,7 @@ class RechnungService(invoice_pb2_grpc.RechnungServiceServicer):
 
 
 def serve():
+    """Starts the gRPC server on port 50051. Exits if the DB connection fails."""
     try:
         servicer = RechnungService()
     except Exception as e:

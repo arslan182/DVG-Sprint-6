@@ -16,6 +16,7 @@ RABBITMQ_USER     = os.getenv("RABBITMQ_USER", "user")
 RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD", "password")
 
 def run():
+    """Sends a test invoice via gRPC and then queues a payment via RabbitMQ."""
     channel = grpc.insecure_channel(f"{GRPC_HOST}:{GRPC_PORT}")
     stub = invoice_pb2_grpc.RechnungServiceStub(channel)
 

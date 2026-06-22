@@ -13,6 +13,7 @@ CAMUNDA_REGION        = os.getenv("CAMUNDA_REGION")
 
 
 async def main():
+    """Publishes a correction message to resume a waiting process instance in Camunda."""
     if len(sys.argv) < 2:
         print("Verwendung: python send_correction.py <rechnungs_nummer>")
         print("Beispiel:   python send_correction.py R-001")

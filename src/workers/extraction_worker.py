@@ -1,14 +1,8 @@
 """
-Sprint 6 – AI Extraction Worker
-Camunda Task: ki-extraktion
+AI Extraction Worker – Camunda Task: ki-extraktion
 
-Ablauf:
-  1. Camunda picked den Task "ki-extraktion"
-  2. Worker liest den PDF-Pfad aus den Prozessvariablen
-  3. Schickt die PDF-Datei an den n8n Webhook
-  4. n8n extrahiert per Google Gemini die Rechnungsdaten
-  5. Worker gibt die extrahierten Variablen an Camunda zurück
-  6. Camunda zeigt die Daten im User Task "Extrahierte Daten prüfen" an
+Picks up the "ki-extraktion" job from Camunda, sends the PDF to the n8n webhook,
+and returns the Gemini-extracted invoice fields back to the process.
 """
 
 import asyncio
@@ -32,24 +26,11 @@ N8N_TIMEOUT_SECONDS = int(os.getenv("N8N_TIMEOUT_SECONDS", "60"))
 
 
 async def ki_extraktion(**kwargs):
-    """
-    Camunda Service Task: ki-extraktion
+    """Sends the PDF to the n8n/Gemini webhook and returns extracted invoice data.
 
-    Erwartete Prozessvariablen:
-      - rechnung_pdf_pfad (String): Lokaler Pfad zur PDF-Datei
-                                    z.B. "rechnungen/RE-2026-001.pdf"
-      - rechnungs_nummer  (String, optional): Rechnungsnummer als Fallback
-
-    Zurückgegebene Variablen:
-      - rechnungs_nummer          (String)
-      - lieferant                 (String)
-      - betrag                    (Number)
-      - waehrung                  (String)
-      - datum                     (String, YYYY-MM-DD)
-      - eingangskanal             (String)
-      - rechnungspositionen       (String, JSON-kodiertes Array)
-      - ki_extraktion_erfolgreich (Boolean)
-      - ki_extraktion_zeitstempel (String)
+    Reads 'rechnung_pdf_pfad' from process variables, posts the file to n8n,
+    and maps the JSON response back to Camunda process variables.
+    Returns ki_extraktion_erfolgreich=False if the PDF is missing.
     """
     pdf_pfad         = kwargs.get("rechnung_pdf_pfad", "")
     rechnungs_nummer = kwargs.get("rechnungs_nummer", "UNBEKANNT")
@@ -102,6 +83,7 @@ async def ki_extraktion(**kwargs):
 
 
 async def main():
+    """Connects to Camunda and starts listening for ki-extraktion jobs."""
     channel = create_camunda_cloud_channel(
         client_id=CAMUNDA_CLIENT_ID,
         client_secret=CAMUNDA_CLIENT_SECRET,

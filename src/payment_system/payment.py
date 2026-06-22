@@ -17,6 +17,7 @@ RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD", "password")
 
 
 def update_invoice_status(rechnungs_nummer):
+    """Sets the invoice status to BEZAHLT in the database."""
     try:
         conn = psycopg2.connect(
             host=DB_HOST,
@@ -37,6 +38,7 @@ def update_invoice_status(rechnungs_nummer):
 
 
 def callback(ch, method, properties, body):
+    """Processes one payment message from the queue and acknowledges it."""
     data = json.loads(body)
     r_nr = data.get("rechnungsnummer")
 
@@ -48,6 +50,7 @@ def callback(ch, method, properties, body):
 
 
 def start_worker():
+    """Connects to RabbitMQ and starts consuming payment orders."""
     connection = pika.BlockingConnection(pika.ConnectionParameters(
         host=RABBITMQ_HOST,
         credentials=pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)

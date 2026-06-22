@@ -1,5 +1,5 @@
 """
-Dvg Sprint 6 – Prozess starten
+Dvg – Prozess starten
 
 Verwendung:
   python start_process.py <pfad_zur_rechnung.pdf>
@@ -7,8 +7,6 @@ Verwendung:
 Beispiele:
   python start_process.py rechnung.pdf
   python start_process.py C:/Downloads/RE-2026-001.pdf
-
-Der KI-Agent (n8n + Gemini) extrahiert automatisch alle Rechnungsdaten aus der PDF.
 """
 
 import os
@@ -28,7 +26,7 @@ PROZESS_ID = "Process_workflow_sprint6"
 
 
 def get_pdf_pfad() -> str:
-    """PDF-Pfad aus Kommandozeile oder interaktiv abfragen."""
+    """Returns the PDF path from the command-line argument or prompts the user."""
     if len(sys.argv) >= 2:
         pfad = sys.argv[1]
     else:
@@ -47,12 +45,12 @@ def get_pdf_pfad() -> str:
 
 
 async def main():
+    """Starts a new invoice process instance in Camunda with the given PDF path."""
     pdf_pfad = get_pdf_pfad()
 
     variablen = {
-        # Sprint 6: nur PDF-Pfad nötig — KI extrahiert den Rest
-        "rechnung_pdf_pfad":    pdf_pfad,
-        # Fallback-Werte falls KI-Extraktion fehlschlägt
+        "rechnung_pdf_pfad":    pdf_pfad,  # AI extracts all invoice data from this file
+        # Fallback values in case extraction fails
         "eingangskanal":        "email",
         "rechnungs_nummer":     "UNBEKANNT",
         "lieferant":            "",

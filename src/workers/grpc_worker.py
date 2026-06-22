@@ -29,6 +29,11 @@ async def save_metadata(
     waehrung: str,
     datum: str,
 ):
+    """Sends invoice metadata to the gRPC server for storage in PostgreSQL.
+
+    Raises BusinessError if the gRPC server is unreachable so Camunda
+    can handle the incident.
+    """
     print(f"[gRPC Worker] Speichere Metadaten: {rechnungs_nummer}")
 
     try:
@@ -62,6 +67,7 @@ async def save_metadata(
 
 
 async def main():
+    """Connects to Camunda and registers the save-invoice-metadata task handler."""
     channel = create_camunda_cloud_channel(
         client_id=CAMUNDA_CLIENT_ID,
         client_secret=CAMUNDA_CLIENT_SECRET,

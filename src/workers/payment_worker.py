@@ -23,6 +23,11 @@ async def initiate_payment(
     betrag: float,
     waehrung: str,
 ):
+    """Publishes a payment order to the RabbitMQ queue.
+
+    The message is durable so it survives a broker restart.
+    Raises BusinessError if RabbitMQ is unreachable.
+    """
     print(f"[Payment Worker] Zahlung für: {rechnungs_nummer}")
 
     try:
@@ -57,6 +62,7 @@ async def initiate_payment(
 
 
 async def main():
+    """Connects to Camunda and registers the initiate-payment task handler."""
     channel = create_camunda_cloud_channel(
         client_id=CAMUNDA_CLIENT_ID,
         client_secret=CAMUNDA_CLIENT_SECRET,
