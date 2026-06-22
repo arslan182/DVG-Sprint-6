@@ -1,12 +1,22 @@
 import grpc
 import pika
 import json
+import os
+from dotenv import load_dotenv
 
 from invoice_metadata import invoice_pb2
 from invoice_metadata import invoice_pb2_grpc
 
+load_dotenv()
+
+GRPC_HOST         = os.getenv("GRPC_HOST", "localhost")
+GRPC_PORT         = os.getenv("GRPC_PORT", "50051")
+RABBITMQ_HOST     = os.getenv("RABBITMQ_HOST", "localhost")
+RABBITMQ_USER     = os.getenv("RABBITMQ_USER", "user")
+RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD", "password")
+
 def run():
-    channel = grpc.insecure_channel("localhost:50051")
+    channel = grpc.insecure_channel(f"{GRPC_HOST}:{GRPC_PORT}")
     stub = invoice_pb2_grpc.RechnungServiceStub(channel)
 
     request = invoice_pb2.RechnungRequest(
@@ -24,10 +34,10 @@ def run():
         print(f"Erfolg: {response.erfolg}, Nachricht: {response.nachricht}")
         
         if response.erfolg:
-            credentials = pika.PlainCredentials("user", "password")
+            credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
             connection = pika.BlockingConnection(
                 pika.ConnectionParameters(
-                    host="localhost",
+                    host=RABBITMQ_HOST,
                     credentials=credentials
                 )
             )
