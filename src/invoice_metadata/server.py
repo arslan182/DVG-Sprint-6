@@ -35,7 +35,8 @@ class RechnungService(invoice_pb2_grpc.RechnungServiceServicer):
         try:
             if self.conn.closed or self.conn.status == psycopg2.extensions.STATUS_IN_TRANSACTION:
                 self.conn.rollback()
-            self.conn.cursor().execute("SELECT 1")
+            with self.conn.cursor() as cur:
+                cur.execute("SELECT 1")
         except Exception:
             print("[DB] Verbindung unterbrochen – reconnect...")
             try:

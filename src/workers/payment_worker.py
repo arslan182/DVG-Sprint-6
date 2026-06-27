@@ -17,6 +17,23 @@ RABBITMQ_HOST     = os.getenv("RABBITMQ_HOST", "localhost")
 RABBITMQ_USER     = os.getenv("RABBITMQ_USER", "user")
 RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD", "password")
 
+# Persistent RabbitMQ connection and channel shared across all jobs.
+_mq_connection: pika.BlockingConnection | None = None
+_mq_channel: pika.adapters.blocking_connection.BlockingChannel | None = None
+
+
+def _get_mq_channel():
+    """Returns a shared RabbitMQ channel, reconnecting if the connection is closed."""
+    global _mq_connection, _mq_channel
+    if _mq_connection is None or _mq_connection.is_closed:
+        credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
+        _mq_connection = pika.BlockingConnection(
+            pika.ConnectionParameters(host=RABBITMQ_HOST, credentials=credentials)
+        )
+        _mq_channel = _mq_connection.channel()
+        _mq_channel.queue_declare(queue="zahlungs_auftraege", durable=True)
+    return _mq_channel
+
 
 async def initiate_payment(
     rechnungs_nummer: str,
@@ -28,15 +45,10 @@ async def initiate_payment(
     The message is durable so it survives a broker restart.
     Raises BusinessError if RabbitMQ is unreachable.
     """
-    print(f"[Payment Worker] Zahlung für: {rechnungs_nummer}")
+    print(f"[Payment Worker] Zahlung fuer: {rechnungs_nummer}")
 
     try:
-        credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=RABBITMQ_HOST, credentials=credentials)
-        )
-        channel = connection.channel()
-        channel.queue_declare(queue="zahlungs_auftraege", durable=True)
+        mq_channel = _get_mq_channel()
 
         zahlungs_daten = {
             "rechnungsnummer": rechnungs_nummer,
@@ -44,17 +56,15 @@ async def initiate_payment(
             "waehrung": waehrung
         }
 
-        channel.basic_publish(
+        mq_channel.basic_publish(
             exchange="",
             routing_key="zahlungs_auftraege",
             body=json.dumps(zahlungs_daten),
             properties=pika.BasicProperties(delivery_mode=2)
         )
 
-        connection.close()
-
         print(f"[Payment Worker] Auftrag gesendet: {rechnungs_nummer}")
-        return {"zahlung_erfolg": True, "zahlung_nachricht": f"Zahlungsauftrag für {rechnungs_nummer} gesendet"}
+        return {"zahlung_erfolg": True, "zahlung_nachricht": f"Zahlungsauftrag fuer {rechnungs_nummer} gesendet"}
 
     except Exception as e:
         print(f"[Payment Worker] Fehler: {e}")

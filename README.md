@@ -62,8 +62,11 @@ Dvg-sprint-6/
 │   ├── client/
 │   │   └── client.py              # Testclient für gRPC + RabbitMQ
 │   └── camunda/
-│       ├── Workflow-Sprint-4.bpmn # BPMN-Prozess
-│       └── compliance_check.dmn   # DMN Compliance-Entscheidungstabelle
+│       ├── Workflow-Sprint-6.bpmn # BPMN-Prozess
+│       ├── compliance_check.dmn   # DMN Compliance-Entscheidungstabelle
+│       └── forms/
+│           ├── invoice_form.json  # User Task Formular: Rechnungsdaten
+│           └── compliance_form.json # User Task Formular: Freigabe / Compliance
 ├── n8n/
 │   └── workflow_rechnungsextraktion.json  # n8n Workflow (importieren in n8n)
 ├── UiPath_ERP_Bot/
@@ -238,28 +241,30 @@ Wenn der gRPC Server oder RabbitMQ nicht erreichbar ist, landet der Prozess in e
 
 ## Compliance-Schwellenwerte (DMN)
 
-| Währung | Schwellenwert |
-|---------|--------------|
-| EUR     | > 10.000     |
-| USD     | > 11.000     |
-| CHF     | > 10.800     |
-| GBP     | > 8.700      |
+| Währung | Compliance nötig | Schwellenwert |
+|---------|-----------------|--------------|
+| EUR     | Ja (> 10.000)   | 10000        |
+| USD     | Ja (> 11.000)   | 11000        |
+| CHF     | Ja (> 10.800)   | 10800        |
+| GBP     | Ja (> 8.700)    | 8700         |
+| Andere  | Ja (> 0)        | 0 (Fallback) |
 
-Die Regeln sind in `src/camunda/compliance_check.dmn` definiert und werden direkt in Camunda ausgewertet.
+Die Regeln sind in `src/camunda/compliance_check.dmn` definiert und werden direkt in Camunda als Business Rule Task ausgewertet (kein Python Worker nötig). Die Fallback-Regel greift bei unbekannten Währungen — der Compliance-Check wird dann immer ausgelöst.
 
 ---
 
 ## n8n Workflow
 
-Der Workflow hat 7 Nodes:
+Der Workflow hat 6 Nodes:
 
-1. **Webhook** – empfängt die PDF als HTTP POST
-2. **PDF in Binary konvertieren** – wandelt den Body in ein n8n Binary-Objekt um
-3. **PDF Text extrahieren** – liest den Textinhalt der PDF
-4. **Gemini Anfrage bauen** – erstellt den Prompt mit Extraktions-Anweisung
-5. **Gemini – Rechnung analysieren** – ruft `gemini-2.5-flash` via REST API auf
-6. **JSON parsen & validieren** – bereinigt die Gemini-Antwort und validiert die Felder
-7. **Respond to Webhook** – schickt das JSON-Ergebnis zurück an den Python Worker
+1. **Webhook** – empfängt die PDF als HTTP POST (raw binary body)
+2. **PDF in Base64 konvertieren** – kodiert die PDF als Base64-String für die Gemini API
+3. **Gemini Anfrage bauen** – erstellt den API-Request mit der PDF als `inline_data` (funktioniert auch mit gescannten PDFs ohne Textlayer)
+4. **Gemini – Rechnung analysieren** – ruft `gemini-2.5-flash` via REST API auf
+5. **JSON parsen & validieren** – bereinigt die Gemini-Antwort und validiert die Felder
+6. **Respond to Webhook** – schickt das JSON-Ergebnis zurück an den Python Worker
+
+> Die PDF wird direkt als `inline_data` an Gemini übergeben — kein separater Text-Extraktionsschritt. Das funktioniert auch für gescannte (image-only) PDFs.
 
 ---
 

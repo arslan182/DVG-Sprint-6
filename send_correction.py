@@ -6,10 +6,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-CAMUNDA_CLIENT_ID     = os.getenv("CAMUNDA_CLIENT_ID")
-CAMUNDA_CLIENT_SECRET = os.getenv("CAMUNDA_CLIENT_SECRET")
-CAMUNDA_CLUSTER_ID    = os.getenv("CAMUNDA_CLUSTER_ID")
-CAMUNDA_REGION        = os.getenv("CAMUNDA_REGION")
+CAMUNDA_CLIENT_ID      = os.getenv("CAMUNDA_CLIENT_ID")
+CAMUNDA_CLIENT_SECRET  = os.getenv("CAMUNDA_CLIENT_SECRET")
+CAMUNDA_CLUSTER_ID     = os.getenv("CAMUNDA_CLUSTER_ID")
+CAMUNDA_REGION         = os.getenv("CAMUNDA_REGION")
+CAMUNDA_CORRECTION_MSG = os.getenv("CAMUNDA_CORRECTION_MSG", "Message_2ae8oeh")
 
 
 async def main():
@@ -33,7 +34,7 @@ async def main():
     client = ZeebeClient(channel)
 
     await client.publish_message(
-        name="Message_2ae8oeh",
+        name=CAMUNDA_CORRECTION_MSG,
         correlation_key=rechnungs_nummer,
         variables={
             "informationen_erhalten": True,

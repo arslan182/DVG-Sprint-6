@@ -22,7 +22,7 @@ CAMUNDA_CLIENT_SECRET = os.getenv("CAMUNDA_CLIENT_SECRET")
 CAMUNDA_CLUSTER_ID    = os.getenv("CAMUNDA_CLUSTER_ID")
 CAMUNDA_REGION        = os.getenv("CAMUNDA_REGION")
 
-PROZESS_ID = "Process_workflow_sprint6"
+PROZESS_ID = os.getenv("CAMUNDA_PROCESS_ID", "Process_workflow_sprint6")
 
 
 def get_pdf_pfad() -> str:
