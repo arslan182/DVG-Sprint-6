@@ -68,6 +68,13 @@
         <outputEntry id="oe_gbp_nein_1"><text>false</text></outputEntry>
         <outputEntry id="oe_gbp_nein_2"><text>8700</text></outputEntry>
       </rule>
+      <!-- Fallback: unbekannte Währung → Compliance immer erforderlich, Schwellenwert 0 -->
+      <rule id="rule_fallback">
+        <inputEntry id="ie_fallback_1"><text></text></inputEntry>
+        <inputEntry id="ie_fallback_2"><text></text></inputEntry>
+        <outputEntry id="oe_fallback_1"><text>true</text></outputEntry>
+        <outputEntry id="oe_fallback_2"><text>0</text></outputEntry>
+      </rule>
     </decisionTable>
   </decision>
 

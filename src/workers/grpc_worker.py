@@ -21,6 +21,19 @@ CAMUNDA_REGION        = os.getenv("CAMUNDA_REGION")
 GRPC_HOST = os.getenv("GRPC_HOST", "localhost")
 GRPC_PORT = int(os.getenv("GRPC_PORT", 50051))
 
+# Persistent channel shared across all jobs — created once at startup.
+_grpc_channel: grpc.Channel | None = None
+_grpc_stub: invoice_pb2_grpc.RechnungServiceStub | None = None
+
+
+def _get_stub() -> invoice_pb2_grpc.RechnungServiceStub:
+    """Returns the shared gRPC stub, creating the channel on first call."""
+    global _grpc_channel, _grpc_stub
+    if _grpc_channel is None:
+        _grpc_channel = grpc.insecure_channel(f"{GRPC_HOST}:{GRPC_PORT}")
+        _grpc_stub = invoice_pb2_grpc.RechnungServiceStub(_grpc_channel)
+    return _grpc_stub
+
 
 async def save_metadata(
     rechnungs_nummer: str,
@@ -37,8 +50,7 @@ async def save_metadata(
     print(f"[gRPC Worker] Speichere Metadaten: {rechnungs_nummer}")
 
     try:
-        channel = grpc.insecure_channel(f"{GRPC_HOST}:{GRPC_PORT}")
-        stub = invoice_pb2_grpc.RechnungServiceStub(channel)
+        stub = _get_stub()
 
         request = invoice_pb2.RechnungRequest(
             rechnungs_nummer=rechnungs_nummer,
@@ -61,9 +73,6 @@ async def save_metadata(
     except grpc.RpcError as e:
         print(f"[gRPC Worker] Nicht erreichbar: {e.details()}")
         raise BusinessError(error_code="grpc-fehler", msg=f"gRPC nicht erreichbar: {e.details()}")
-
-    finally:
-        channel.close()
 
 
 async def main():

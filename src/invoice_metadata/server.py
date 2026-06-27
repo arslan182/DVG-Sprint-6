@@ -14,16 +14,35 @@ DB_USER     = os.getenv("DB_USER", "admin")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "secretpassword")
 
 
+def _connect() -> psycopg2.extensions.connection:
+    """Opens and returns a new database connection."""
+    return psycopg2.connect(
+        host=DB_HOST,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+    )
+
+
 class RechnungService(invoice_pb2_grpc.RechnungServiceServicer):
     def __init__(self):
         """Opens the database connection and ensures the invoices table exists."""
-        self.conn = psycopg2.connect(
-            host=DB_HOST,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD
-        )
+        self.conn = _connect()
         self._create_table()
+
+    def _ensure_connection(self):
+        """Reconnects if the current connection is closed or broken."""
+        try:
+            if self.conn.closed or self.conn.status == psycopg2.extensions.STATUS_IN_TRANSACTION:
+                self.conn.rollback()
+            self.conn.cursor().execute("SELECT 1")
+        except Exception:
+            print("[DB] Verbindung unterbrochen – reconnect...")
+            try:
+                self.conn.close()
+            except Exception:
+                pass
+            self.conn = _connect()
 
     def _create_table(self):
         """Creates the invoices table if it doesn't exist yet."""
@@ -43,6 +62,8 @@ class RechnungService(invoice_pb2_grpc.RechnungServiceServicer):
     def SpeichereMetadaten(self, request, context):
         """Inserts or updates an invoice record. Returns success/failure in the response."""
         status_name = invoice_pb2.RechnungsStatus.Name(request.status)
+
+        self._ensure_connection()
 
         try:
             with self.conn.cursor() as cur:
@@ -66,6 +87,10 @@ class RechnungService(invoice_pb2_grpc.RechnungServiceServicer):
 
         except Exception as e:
             print(f"[DB] Fehler: {e}")
+            try:
+                self.conn.rollback()
+            except Exception:
+                pass
             return invoice_pb2.RechnungResponse(erfolg=False, nachricht=str(e))
 
 

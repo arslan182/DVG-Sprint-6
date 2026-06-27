@@ -6,6 +6,7 @@ and returns the Gemini-extracted invoice fields back to the process.
 """
 
 import asyncio
+import json
 import os
 import httpx
 from dotenv import load_dotenv
@@ -65,7 +66,6 @@ async def ki_extraktion(**kwargs):
         data = response.json()
         print(f"[ki-extraktion] Extraktion erfolgreich: {data}")
 
-    import json
     return {
         "rechnungs_nummer":          data.get("rechnungs_nummer", rechnungs_nummer),
         "lieferant":                 data.get("lieferant", ""),
