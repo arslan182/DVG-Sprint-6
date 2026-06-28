@@ -17,28 +17,24 @@ Sprint 6 erweitert den RPA-Bot aus Sprint 5 um einen AI-Agenten. Statt Rechnungs
 
 ## Architektur
 
+Das vollständige Architekturdiagramm für Sprint 6 befindet sich unter:
+
 ```
-PDF-Datei
-    │
-    ▼
-extraction_worker.py  ──▶  n8n Webhook  ──▶  Google Gemini 2.5 Flash
-                                                       │
-                                               Extrahierte JSON-Daten
-                                                       │
-                                                       ▼
-                                          Camunda 8 SaaS (BPMN-Prozess)
-                                                       │  Zeebe Jobs
-                                                       ▼
-                                            Python Worker (pyzeebe)
-                                             ├── auto_workers.py
-                                             ├── grpc_worker.py
-                                             └── payment_worker.py
-                                                       │
-                                          ┌────────────┴────────────┐
-                                          ▼                         ▼
-                                   gRPC Server               RabbitMQ Queue
-                                   PostgreSQL DB             Payment Consumer
+docs/Architekturdiagramm/Architekturdiagramm.png   ← Gesamtübersicht (alle 6 Ebenen)
+docs/Architekturdiagramm/Ebene (1-2-3).png         ← Ebenen 1–3: Eingang, KI, Prozess
+docs/Architekturdiagramm/Ebene (4-5-6).png         ← Ebenen 4–6: Worker, Services, Daten
 ```
+
+Das System ist in 6 horizontale Ebenen gegliedert:
+
+| Ebene | Name | Komponenten |
+|-------|------|-------------|
+| 1 | Benutzer- und Eingangsebene | Benutzer, PDF-Datei, `start_process.py` |
+| 2 | KI-Extraktions-Ebene *(neu in Sprint 6)* | `extraction_worker.py` → n8n → Google Gemini 2.5 Flash |
+| 3 | Prozess- und Workflow-Ebene | Camunda 8 SaaS, BPMN, DMN, Camunda Tasklist (User Tasks) |
+| 4 | Integrations-Ebene | Python Workers (pyzeebe), RabbitMQ Queue |
+| 5 | Service-Ebene | gRPC Server, UiPath RPA Bot, Payment Consumer |
+| 6 | Datenhaltung | PostgreSQL |
 
 ---
 
@@ -79,6 +75,7 @@ Dvg-sprint-6/
 │       ├── RabbitMQ/docker-compose.yml
 │       └── postgres/docker-compose.yml
 ├── docs/
+│   ├── Architekturdiagramm/       # Architekturdiagramme (Sprint 6)
 │   └── screenshots/               # Testdokumentation (Prozess-Screenshots)
 ├── tests/
 │   └── test_workers.py

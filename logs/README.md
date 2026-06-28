@@ -20,6 +20,8 @@ Terminal-Ausgaben der Worker und Server, plus Screenshots aus Camunda, n8n und U
 |-------|--------|
 | `screenshots/n8n_Workflow_Succeeded.png` | n8n — Workflow erfolgreich ausgeführt (Gemini-Extraktion) |
 | `screenshots/Camunda_Operate_Prozess_Abgeschlossen.png` | Camunda Operate — Prozessinstanz komplett durchgelaufen |
+| `screenshots/Camunda_Operate_Metadaten_Manuell.png` | Camunda Operate — Manueller Fallback: Metadaten manuell speichern (Boundary Error) |
+| `screenshots/Camunda_Operate_Fehlerbehandlung_Manuell.png` | Camunda Operate — Manueller Fallback: Zahlung manuell erfassen (Boundary Error) |
 | `screenshots/UiPath_RPA_Successful.png` | UiPath Orchestrator — Job Successful |
 | `screenshots/DMN_Compliance_Schwellenwert.png` | Camunda Modeler — DMN Entscheidungstabelle |
 
