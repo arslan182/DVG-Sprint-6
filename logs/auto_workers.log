@@ -1,2 +1,15 @@
 [Auto Workers] Cluster: 487e2664-45fe-4a21-9e53-860eddc37e5e
 [Auto Workers] Wartet auf Jobs...
+[rechnung-erfassen] UNBEKANNT via email
+[uipath-erp-queue] Starte f³r Rechnung RE-2026-00099
+[uipath-erp-queue] Token erhalten
+[uipath-erp-queue] StartJobs: 201 {"@odata.context":"https://cloud.uipath.com/gruppe11dvg/DefaultTenant/orchestrator_/odata/$metadata#Jobs","value":[{"FolderKey":"e465613c-7151-4c9e-9037-633678153cce","Key":"348f2a95-b7e5-446d-a525-8c0a39f8a97b","StartTime":null,"EndTime":null,"State":"Pending","SubState":null,"JobPriority":"Normal"
+[uipath-erp-queue] Job gestartet, ID: 695223069
+[uipath-erp-queue] Job Status: Running (Versuch 1/30)
+[uipath-erp-queue] Job Status: Running (Versuch 2/30)
+[uipath-erp-queue] Job Status: Running (Versuch 3/30)
+[uipath-erp-queue] Job Status: Running (Versuch 4/30)
+[uipath-erp-queue] Job Status: Running (Versuch 5/30)
+[uipath-erp-queue] Job Status: Successful (Versuch 6/30)
+[uipath-erp-queue] Bot erfolgreich abgeschlossen.
+[rechnung-archivieren] RE-2026-00099, 8300.25 EUR
