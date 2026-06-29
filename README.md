@@ -6,10 +6,11 @@
 
 ## Überblick
 
-Sprint 6 erweitert den RPA-Bot aus Sprint 5 um einen AI-Agenten. Statt Rechnungsdaten manuell einzugeben, schickt der Python Worker die PDF-Datei an einen n8n Workflow, der mit **Google Gemini 2.5 Flash** die Daten automatisch extrahiert. Der Mensch prüft das Ergebnis kurz im Camunda Tasklist und gibt es frei — danach läuft alles automatisch weiter.
+Sprint 6 erweitert den RPA-Bot aus Sprint 5 um einen AI-Agenten und einen automatischen E-Mail-Eingang. Rechnungen können jetzt per E-Mail eingehen — der Prozess startet vollautomatisch. Google Gemini 2.5 Flash extrahiert die Daten aus dem PDF, der Mitarbeiter prüft kurz im Camunda Tasklist und gibt frei — danach läuft alles automatisch weiter.
 
 **Neu in Sprint 6:**
 - AI-Extraktion per n8n + Google Gemini (Rechnungsnummer, Lieferant, Betrag, Positionen, …)
+- **E-Mail-Eingang:** Gmail → Google Drive → Camunda (Message Start Event) — vollautomatisch
 - UiPath Bot trägt jetzt auch einzelne Rechnungspositionen ins ERP ein
 - Compliance-Check läuft direkt über eine DMN-Entscheidungstabelle in Camunda (kein Worker mehr nötig)
 
@@ -29,12 +30,12 @@ Das System ist in 6 horizontale Ebenen gegliedert:
 
 | Ebene | Name | Komponenten |
 |-------|------|-------------|
-| 1 | Benutzer- und Eingangsebene | Benutzer, PDF-Datei, `start_process.py` |
+| 1 | Benutzer- und Eingangsebene | Benutzer, PDF-Datei, `start_process.py` / Gmail → n8n → `email_receiver.py` |
 | 2 | KI-Extraktions-Ebene *(neu in Sprint 6)* | `extraction_worker.py` → n8n → Google Gemini 2.5 Flash |
 | 3 | Prozess- und Workflow-Ebene | Camunda 8 SaaS, BPMN, DMN, Camunda Tasklist (User Tasks) |
 | 4 | Integrations-Ebene | Python Workers (pyzeebe), RabbitMQ Queue |
 | 5 | Service-Ebene | gRPC Server, UiPath RPA Bot, Payment Consumer |
-| 6 | Datenhaltung | PostgreSQL |
+| 6 | Datenhaltung | PostgreSQL, Google Drive |
 
 ---
 
@@ -64,7 +65,8 @@ Dvg-sprint-6/
 │           ├── invoice_form.json  # User Task Formular: Rechnungsdaten
 │           └── compliance_form.json # User Task Formular: Freigabe / Compliance
 ├── n8n/
-│   └── workflow_rechnungsextraktion.json  # n8n Workflow (importieren in n8n)
+│   ├── workflow_rechnungsextraktion.json       # n8n Workflow: KI-Extraktion (Gemini)
+│   └── workflow_gmail_rechnungseingang.json    # n8n Workflow: Gmail → Google Drive → Camunda
 ├── UiPath_ERP_Bot/
 │   ├── Main.xaml                  # UiPath Workflow
 │   ├── inject_script.js           # JavaScript für ERP-Formular Ausfüllung
@@ -80,6 +82,7 @@ Dvg-sprint-6/
 ├── tests/
 │   └── test_workers.py
 ├── start_process.py               # Prozess starten (PDF-Pfad als Argument)
+├── email_receiver.py              # Lokaler HTTP-Server: Gmail-Trigger → Camunda Message
 ├── send_correction.py             # Korrektur-Nachricht an wartenden Prozess senden
 ├── test_rechnung.pdf              # Test-PDF für manuelle Tests
 ├── .env                           # Secrets (nicht ins Git!)
@@ -95,6 +98,7 @@ Dvg-sprint-6/
 - Docker
 - Camunda 8 SaaS Account (kostenlos unter [camunda.io](https://camunda.io))
 - Google AI Studio API-Key ([aistudio.google.com](https://aistudio.google.com))
+- Google Cloud Projekt mit Gmail API + Google Drive API (für E-Mail-Eingang)
 - UiPath Cloud Account mit deployed RPA Workflow
 
 ```bash
@@ -133,6 +137,12 @@ DB_PASSWORD=...
 N8N_WEBHOOK_URL=http://localhost:5678/webhook/rechnungsextraktion
 N8N_TIMEOUT_SECONDS=60
 
+# Google Drive (E-Mail-Eingang)
+GOOGLE_DRIVE_FOLDER_ID=...
+
+# Email Receiver Server
+EMAIL_RECEIVER_PORT=8081
+
 # UiPath
 UIPATH_CLIENT_ID=...
 UIPATH_CLIENT_SECRET=...
@@ -146,14 +156,19 @@ UIPATH_POLL_RETRIES=30
 UIPATH_JOB_TIMEOUT_MS=180000
 ```
 
-### 2. n8n Workflow importieren
+### 2. n8n Workflows importieren
 
 ```bash
 cd extras/compose/n8n
 docker-compose up -d
 ```
 
-Dann unter `http://localhost:5678` öffnen, die Datei `n8n/workflow_rechnungsextraktion.json` importieren und den Google Gemini API-Key als Credential hinterlegen (Typ: *Google Gemini(PaLM) Api*). Workflow aktivieren.
+Dann unter `http://localhost:5678` öffnen und beide Workflows importieren:
+
+- `n8n/workflow_rechnungsextraktion.json` — Google Gemini API-Key als Credential hinterlegen (Typ: *Google Gemini(PaLM) Api*)
+- `n8n/workflow_gmail_rechnungseingang.json` — Gmail OAuth2 und Google Drive OAuth2 Credentials hinterlegen
+
+Beide Workflows aktivieren.
 
 ### 3. PostgreSQL und RabbitMQ starten
 
@@ -166,7 +181,7 @@ cd extras/compose/RabbitMQ && docker-compose up -d
 
 ## System starten
 
-Alle fünf Terminals müssen gleichzeitig laufen:
+Für den vollständigen Betrieb (inkl. E-Mail-Eingang) müssen alle sechs Terminals gleichzeitig laufen:
 
 **Terminal 1** – gRPC Server:
 ```bash
@@ -193,19 +208,27 @@ python src/workers/grpc_worker.py
 python src/workers/payment_worker.py
 ```
 
+**Terminal 6** – Email Receiver (nur für E-Mail-Eingang nötig):
+```bash
+python email_receiver.py
+```
+
 ---
 
 ## Prozess starten
 
+**Option 1 – Manuell (lokale PDF):**
 ```bash
 python start_process.py test_rechnung.pdf
 ```
 
 Oder ohne Argument — dann wird nach dem Pfad gefragt:
-
 ```bash
 python start_process.py
 ```
+
+**Option 2 – Per E-Mail:**
+Eine E-Mail mit PDF-Anhang an die verknüpfte Gmail-Adresse schicken. n8n erkennt die E-Mail automatisch, lädt das PDF in Google Drive hoch und startet den Camunda-Prozess über den Message Start Event `Rechnung_per_Mail`.
 
 ---
 
@@ -305,6 +328,8 @@ $env:PYTHONPATH = "."; pytest tests/test_workers.py -v
 ## Hinweise
 
 - Der Camunda Trial Cluster pausiert nach längerer Inaktivität — vor dem Testen im [Camunda Console](https://console.camunda.io) prüfen ob er noch läuft.
-- n8n muss laufen und der Workflow muss aktiviert sein, bevor ein Prozess gestartet wird.
+- n8n muss laufen und beide Workflows müssen aktiviert sein, bevor ein Prozess gestartet wird.
 - Der Google Gemini API-Key hat auf dem Free-Tier ein Rate Limit — zwischen Tests kurz warten wenn 429-Fehler auftreten.
 - Der UiPath Bot läuft in einer Cloud-Session — das ausgefüllte ERP-Formular ist nur über den UiPath Live Stream sichtbar, nicht im lokalen Browser.
+- Für den E-Mail-Eingang muss `email_receiver.py` lokal laufen — n8n (Docker) erreicht ihn über `host.docker.internal:8081`.
+- Die Gmail OAuth2 App muss im Google Cloud Projekt als Testnutzer die eigene E-Mail-Adresse eingetragen haben.

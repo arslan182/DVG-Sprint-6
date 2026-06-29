@@ -25,6 +25,7 @@ CAMUNDA_CLIENT_ID     = os.getenv("CAMUNDA_CLIENT_ID")
 CAMUNDA_CLIENT_SECRET = os.getenv("CAMUNDA_CLIENT_SECRET")
 CAMUNDA_CLUSTER_ID    = os.getenv("CAMUNDA_CLUSTER_ID")
 CAMUNDA_REGION        = os.getenv("CAMUNDA_REGION", "bru-2")
+EMAIL_RECEIVER_PORT   = int(os.getenv("EMAIL_RECEIVER_PORT", "8081"))
 
 
 async def _publish_message(drive_url: str, dateiname: str, absender: str) -> None:
@@ -100,7 +101,7 @@ class EmailReceiverHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    server = HTTPServer(("0.0.0.0", 8081), EmailReceiverHandler)
-    print("[Email-Receiver] Lauscht auf http://localhost:8081/starte-prozess")
+    server = HTTPServer(("0.0.0.0", EMAIL_RECEIVER_PORT), EmailReceiverHandler)
+    print(f"[Email-Receiver] Lauscht auf http://localhost:{EMAIL_RECEIVER_PORT}/starte-prozess")
     print(f"[Email-Receiver] Camunda Cluster: {CAMUNDA_CLUSTER_ID}")
     server.serve_forever()

@@ -52,17 +52,28 @@ Die Fallback-Regel (leere Bedingungen) greift bei unbekannten Währungen — der
 | Zahlung veranlassen | `initiate-payment` | payment_worker.py |
 | Rechnung archivieren | `rechnung-archivieren` | auto_workers.py |
 
+## Start Events
+
+Der Prozess kann auf zwei Wegen gestartet werden:
+
+| Start Event | Typ | Beschreibung |
+|-------------|-----|-------------|
+| Rechnung erhalten | None Start Event | Manuell per `start_process.py` oder Portal |
+| Rechnung per E-Mail erhalten | Message Start Event (`Rechnung_per_Mail`) | Automatisch via Gmail → n8n → email_receiver.py |
+
 ## Prozessvariablen
 
 | Variable | Typ | Beschreibung |
 |----------|-----|-------------|
-| `rechnung_pdf_pfad` | String | Pfad zur PDF-Datei |
+| `rechnung_pdf_pfad` | String | Lokaler Pfad oder Google Drive URL zur PDF |
 | `rechnungs_nummer` | String | Eindeutige Rechnungsnummer |
 | `lieferant` | String | Name des Lieferanten |
 | `betrag` | Number | Rechnungsbetrag |
 | `waehrung` | String | EUR / USD / CHF / GBP |
 | `datum` | String | Datum im Format YYYY-MM-DD |
 | `eingangskanal` | String | email / portal / edi |
+| `absender` | String | E-Mail-Adresse des Absenders (nur bei Email-Eingang) |
+| `anhang_vorhanden` | Boolean | Ob ein PDF-Anhang gefunden wurde |
 | `validierung_erfolgreich` | Boolean | Ergebnis der automatischen Validierung |
 | `rechnung_genehmigt` | Boolean | Manuelle Freigabe durch Sachbearbeiter |
 | `ki_extraktion_erfolgreich` | Boolean | Ob Gemini-Extraktion geklappt hat |
