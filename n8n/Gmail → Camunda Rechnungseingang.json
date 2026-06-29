@@ -1,0 +1,292 @@
+{
+  "name": "Gmail → Camunda Rechnungseingang",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "readStatus": "unread"
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "id": "212b4009-9f09-4e9c-b0da-82cdb2e0cc8f",
+      "name": "Gmail – Neue Rechnung",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        192
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bzkECAqep4wKIrtA",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prüfen ob ein PDF-Anhang vorhanden ist\nconst item = $input.first();\n\nconst attachmentKeys = Object.keys(item.binary || {});\nconst pdfKey = attachmentKeys.find(k => {\n  const mime = item.binary[k]?.mimeType || '';\n  const name = item.binary[k]?.fileName || '';\n  return mime === 'application/pdf' || name.toLowerCase().endsWith('.pdf');\n});\n\nif (!pdfKey) {\n  return [{ json: { anhang_vorhanden: false, grund: 'Kein PDF-Anhang gefunden' } }];\n}\n\nconst attachment = item.binary[pdfKey];\nconst absender = item.json?.from || 'unbekannt';\nconst betreff = item.json?.subject || 'Rechnung';\nconst timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);\nconst dateiname = (attachment.fileName || 'rechnung.pdf').replace(/[^a-zA-Z0-9._-]/g, '_');\nconst finaler_dateiname = `${timestamp}_${dateiname}`;\n\nreturn [{\n  json: {\n    anhang_vorhanden: true,\n    pdf_key: pdfKey,\n    dateiname,\n    finaler_dateiname,\n    absender,\n    betreff\n  },\n  binary: item.binary\n}];"
+      },
+      "id": "88cbf08a-c0d4-45b1-9289-d6efe65fdaf5",
+      "name": "PDF-Anhang prüfen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "check-pdf",
+              "leftValue": "={{ $json.anhang_vorhanden }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7ecce287-ce00-4c60-98d1-f38d51aa645b",
+      "name": "Hat PDF?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        256,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "={{ $json.pdf_key }}",
+        "name": "={{ $json.finaler_dateiname }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1E53KKSk3Fkjvo0ScnJ7KT6NqU538yqMr",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "27a9ecc0-c9f9-4be2-ad38-8d525c842c07",
+      "name": "PDF zu Google Drive hochladen",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        496,
+        64
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "egGWq2SMBB07jqs2",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Google Drive Link und File-ID aus der Upload-Antwort extrahieren\nconst item = $('PDF zu Google Drive hochladen').first();\nconst fileId = item.json?.id;\nconst fileName = item.json?.name;\n\nif (!fileId) throw new Error('Google Drive Upload fehlgeschlagen – keine File-ID erhalten');\n\nconst driveUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&authuser=0`;\n\nconsole.log(`[Gmail-Workflow] PDF in Google Drive: ${fileName} (${fileId})`);\n\nreturn [{\n  json: {\n    drive_file_id: fileId,\n    drive_url: driveUrl,\n    dateiname: fileName,\n    absender: $('PDF-Anhang prüfen').item.json.absender,\n    betreff: $('PDF-Anhang prüfen').item.json.betreff\n  }\n}];"
+      },
+      "id": "e5766223-6705-4015-ae67-8c35c9f70fcb",
+      "name": "Drive-Link aufbereiten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8081/starte-prozess",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({\n  drive_url: $json.drive_url,\n  dateiname: $json.dateiname,\n  absender: $json.absender\n}) }}",
+        "options": {}
+      },
+      "id": "c275ccfa-aee9-4b75-9b57-55faadda90a1",
+      "name": "Camunda Prozess starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1184,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconsole.log(`[Gmail-Workflow] E-Mail ohne PDF ignoriert: ${item.json.grund}`);\nreturn [{ json: { status: 'ignoriert', ...item.json } }];"
+      },
+      "id": "db92234c-844e-4871-821f-daadc37c1f71",
+      "name": "Kein PDF – ignorieren",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.id }}/permissions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "role",
+              "value": "reader"
+            },
+            {
+              "name": "type",
+              "value": "anyone"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        704,
+        64
+      ],
+      "id": "00d675ec-4e75-415d-8de1-0f241e0d5bfc",
+      "name": "HTTP Request",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "egGWq2SMBB07jqs2",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail – Neue Rechnung": {
+      "main": [
+        [
+          {
+            "node": "PDF-Anhang prüfen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF-Anhang prüfen": {
+      "main": [
+        [
+          {
+            "node": "Hat PDF?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hat PDF?": {
+      "main": [
+        [
+          {
+            "node": "PDF zu Google Drive hochladen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Kein PDF – ignorieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF zu Google Drive hochladen": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive-Link aufbereiten": {
+      "main": [
+        [
+          {
+            "node": "Camunda Prozess starten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Drive-Link aufbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a394dbc4-c80f-4866-8c72-fc447e7b5eca",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "16900a5a77d6110570ff404dce998eae28fc5480e770376850615709ef7058ff"
+  },
+  "nodeGroups": [],
+  "id": "3kjP3RZi0h3oOtNf",
+  "tags": [
+    {
+      "updatedAt": "2026-06-14T15:27:37.517Z",
+      "createdAt": "2026-06-14T15:27:37.517Z",
+      "id": "N7rNUGzwhjj1h2GX",
+      "name": "DVG Sprint 6"
+    }
+  ]
+}

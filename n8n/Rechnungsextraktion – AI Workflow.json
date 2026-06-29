@@ -10,31 +10,41 @@
           "rawBody": true
         }
       },
-      "id": "node-webhook",
+      "id": "e03d6d57-4e51-48ce-995d-a54e340eb83f",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [200, 300]
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "bc6b7414-f78a-4be7-90bb-fa87ae9a06ca"
     },
     {
       "parameters": {
-        "jsCode": "// Rohe PDF-Bytes aus dem Webhook-Body in Base64 konvertieren\nconst item = $input.first();\n\nconst body = item.json?.body;\nif (!body) throw new Error('Keine PDF-Daten empfangen');\n\nlet buffer;\nif (Buffer.isBuffer(body)) {\n  buffer = body;\n} else if (typeof body === 'string') {\n  buffer = Buffer.from(body, 'binary');\n} else {\n  buffer = Buffer.from(body);\n}\n\nconst base64 = buffer.toString('base64');\n\nreturn [{ json: { pdfBase64: base64 } }];"
+        "jsCode": "// Rohe PDF-Bytes aus dem Webhook-Body in Base64 konvertieren\nconst item = $input.first();\n\n// n8n speichert binary POST-Daten in item.binary.data\nif (item.binary?.data) {\n  return [{ json: { pdfBase64: item.binary.data.data } }];\n}\n\n// Fallback: body als Buffer/String\nconst body = item.json?.body;\nif (!body) throw new Error('Keine PDF-Daten empfangen');\n\nlet buffer;\nif (Buffer.isBuffer(body)) {\n  buffer = body;\n} else if (typeof body === 'string') {\n  buffer = Buffer.from(body, 'binary');\n} else {\n  buffer = Buffer.from(body);\n}\n\nreturn [{ json: { pdfBase64: buffer.toString('base64') } }];"
       },
-      "id": "node-to-binary",
+      "id": "df412436-48a0-42b9-a0e8-fb9fb03c7b7a",
       "name": "PDF in Base64 konvertieren",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 300]
+      "position": [
+        240,
+        0
+      ]
     },
     {
       "parameters": {
         "jsCode": "// PDF als inline_data direkt an Gemini schicken – funktioniert auch bei Scans\nconst pdfBase64 = $input.first().json.pdfBase64;\n\nif (!pdfBase64) throw new Error('Keine PDF-Daten vorhanden');\n\nconst prompt = `Analysiere diese Rechnung und extrahiere alle relevanten Daten als JSON.\\n\\nExtrahiere genau diese Felder:\\n- rechnungs_nummer: Rechnungsnummer (String)\\n- lieferant: Name des Lieferanten (String)\\n- betrag: Gesamtbetrag als Zahl ohne Waehrungssymbol (Number)\\n- waehrung: Waehrungscode EUR, USD, CHF oder GBP (String)\\n- datum: Rechnungsdatum im Format YYYY-MM-DD (String)\\n- eingangskanal: \"Email\" wenn nicht anders angegeben (String)\\n- rechnungspositionen: Array mit Positionen, jede mit: beschreibung (String), menge (Number), einheit (String, z.B. Stk.), einzelpreis (Number)\\n\\nAntworte NUR mit dem JSON-Objekt, ohne Erklaerungstext, ohne Markdown-Code-Bloecke.`;\n\nconst requestBody = JSON.stringify({\n  contents: [{\n    parts: [\n      {\n        inline_data: {\n          mime_type: 'application/pdf',\n          data: pdfBase64\n        }\n      },\n      {\n        text: prompt\n      }\n    ]\n  }]\n});\n\nreturn [{ json: { requestBody } }];"
       },
-      "id": "node-build",
+      "id": "e3383532-edaa-48fb-973d-dc44246adcd2",
       "name": "Gemini Anfrage bauen",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [680, 300]
+      "position": [
+        480,
+        0
+      ]
     },
     {
       "parameters": {
@@ -48,21 +58,33 @@
         "body": "={{ $json.requestBody }}",
         "options": {}
       },
-      "id": "node-gemini",
+      "id": "c6c663dc-c834-420f-948b-afbbdcb5fed2",
       "name": "Gemini – Rechnung analysieren",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [920, 300]
+      "position": [
+        720,
+        0
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "kGDrcLlDmIwcSPUM",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
     },
     {
       "parameters": {
         "jsCode": "// Gemini-Antwort parsen\nconst response = $input.first().json;\nconst rawText = response?.candidates?.[0]?.content?.parts?.[0]?.text || '';\n\nlet jsonText = rawText.trim();\nif (jsonText.startsWith('```')) {\n  jsonText = jsonText.replace(/^```json?\\n?/, '').replace(/\\n?```$/, '');\n}\n\nlet extracted;\ntry {\n  extracted = JSON.parse(jsonText);\n} catch (e) {\n  throw new Error(`JSON-Parsing fehlgeschlagen: ${e.message}\\nAntwort: ${rawText.substring(0, 300)}`);\n}\n\nconst result = {\n  rechnungs_nummer: String(extracted.rechnungs_nummer || 'UNBEKANNT'),\n  lieferant: String(extracted.lieferant || 'UNBEKANNT'),\n  betrag: parseFloat(extracted.betrag) || 0,\n  waehrung: ['EUR','USD','CHF','GBP'].includes(extracted.waehrung) ? extracted.waehrung : 'EUR',\n  datum: extracted.datum || new Date().toISOString().split('T')[0],\n  eingangskanal: extracted.eingangskanal || 'Email',\n  rechnungspositionen: Array.isArray(extracted.rechnungspositionen) ? extracted.rechnungspositionen : [],\n  ki_extraktion_erfolgreich: true,\n  ki_extraktion_zeitstempel: new Date().toISOString(),\n};\n\nreturn [{ json: result }];"
       },
-      "id": "node-parse",
+      "id": "0b8d4ac3-c039-4a58-b8a1-7bd0b4e48205",
       "name": "JSON parsen & validieren",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1160, 300]
+      "position": [
+        960,
+        0
+      ]
     },
     {
       "parameters": {
@@ -72,36 +94,92 @@
           "responseCode": 200
         }
       },
-      "id": "node-respond-ok",
+      "id": "ceb0368e-67de-4190-9183-f992f2ee16e2",
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1400, 300]
+      "position": [
+        1200,
+        0
+      ]
     }
   ],
+  "pinData": {},
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "PDF in Base64 konvertieren", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "PDF in Base64 konvertieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "PDF in Base64 konvertieren": {
-      "main": [[{ "node": "Gemini Anfrage bauen", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Gemini Anfrage bauen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Gemini Anfrage bauen": {
-      "main": [[{ "node": "Gemini – Rechnung analysieren", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Gemini – Rechnung analysieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Gemini – Rechnung analysieren": {
-      "main": [[{ "node": "JSON parsen & validieren", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "JSON parsen & validieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "JSON parsen & validieren": {
-      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
   },
+  "versionId": "390fea04-223f-41be-94d3-84b4bde0cc83",
   "meta": {
-    "templateCredsSetupCompleted": false
+    "instanceId": "16900a5a77d6110570ff404dce998eae28fc5480e770376850615709ef7058ff"
   },
-  "tags": [{ "name": "DVG Sprint 6" }]
+  "nodeGroups": [],
+  "id": "QG2LRoFgQPLEba8e",
+  "tags": [
+    {
+      "updatedAt": "2026-06-14T15:27:37.517Z",
+      "createdAt": "2026-06-14T15:27:37.517Z",
+      "id": "N7rNUGzwhjj1h2GX",
+      "name": "DVG Sprint 6"
+    }
+  ]
 }
