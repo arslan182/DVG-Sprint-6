@@ -1,6 +1,3 @@
 [Extraction Worker] Cluster:      487e2664-45fe-4a21-9e53-860eddc37e5e
 [Extraction Worker] n8n Webhook:  http://localhost:5678/webhook/rechnungsextraktion
 [Extraction Worker] Wartet auf Jobs...
-[ki-extraktion] Starte f³r UNBEKANNT, PDF: C:\Users\aliar\workspace\Dvg\Dvg-sprint-6\test_rechnung.pdf
-[ki-extraktion] Sende PDF an n8n: http://localhost:5678/webhook/rechnungsextraktion
-[ki-extraktion] Extraktion erfolgreich: {'rechnungs_nummer': 'RE-2026-00099', 'lieferant': 'Mustermann GmbH', 'betrag': 8300.25, 'waehrung': 'EUR', 'datum': '2026-05-15', 'eingangskanal': 'Email', 'rechnungspositionen': [{'beschreibung': 'Softwareentwicklung Backend', 'menge': 40, 'einheit': 'Std.', 'einzelpreis': 95}, {'beschreibung': 'Projektmanagement', 'menge': 10, 'einheit': 'Std.', 'einzelpreis': 85}, {'beschreibung': 'Serverlizenz Cloud', 'menge': 1, 'einheit': 'Stk.', 'einzelpreis': 1200}, {'beschreibung': 'Dokumentation & Testing', 'menge': 15, 'einheit': 'Std.', 'einzelpreis': 75}], 'ki_extraktion_erfolgreich': True, 'ki_extraktion_zeitstempel': '2026-06-28T16:31:00.227Z'}

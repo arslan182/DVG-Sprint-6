@@ -26,11 +26,26 @@ N8N_WEBHOOK_URL = os.getenv(
 N8N_TIMEOUT_SECONDS = int(os.getenv("N8N_TIMEOUT_SECONDS", "60"))
 
 
+async def lade_pdf_bytes(pdf_pfad: str) -> bytes:
+    """Lädt PDF-Bytes – entweder von Google Drive URL oder vom lokalen Dateisystem."""
+    if pdf_pfad.startswith("http://") or pdf_pfad.startswith("https://"):
+        print(f"[ki-extraktion] Lade PDF von URL: {pdf_pfad}")
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(pdf_pfad, follow_redirects=True)
+            if response.status_code != 200:
+                raise Exception(f"PDF-Download fehlgeschlagen: HTTP {response.status_code}")
+            return response.content
+    else:
+        print(f"[ki-extraktion] Lese PDF lokal: {pdf_pfad}")
+        with open(pdf_pfad, "rb") as f:
+            return f.read()
+
+
 async def ki_extraktion(**kwargs):
     """Sends the PDF to the n8n/Gemini webhook and returns extracted invoice data.
 
-    Reads 'rechnung_pdf_pfad' from process variables, posts the file to n8n,
-    and maps the JSON response back to Camunda process variables.
+    Reads 'rechnung_pdf_pfad' from process variables (local path or Google Drive URL),
+    posts the file to n8n, and maps the JSON response back to Camunda process variables.
     Returns ki_extraktion_erfolgreich=False if the PDF is missing.
     """
     pdf_pfad         = kwargs.get("rechnung_pdf_pfad", "")
@@ -38,19 +53,21 @@ async def ki_extraktion(**kwargs):
 
     print(f"[ki-extraktion] Starte für {rechnungs_nummer}, PDF: {pdf_pfad}")
 
-    if not pdf_pfad or not os.path.isfile(pdf_pfad):
+    ist_url = pdf_pfad.startswith("http://") or pdf_pfad.startswith("https://")
+
+    if not pdf_pfad or (not ist_url and not os.path.isfile(pdf_pfad)):
         print(f"[ki-extraktion] WARNUNG: PDF nicht gefunden: {pdf_pfad}")
         print(f"[ki-extraktion] Überspringe AI-Extraktion, Felder bleiben leer.")
         return {
             "ki_extraktion_erfolgreich": False,
             "ki_extraktion_fehler": f"PDF nicht gefunden: {pdf_pfad}",
+            "anhang_vorhanden": False,
         }
 
     print(f"[ki-extraktion] Sende PDF an n8n: {N8N_WEBHOOK_URL}")
 
     async with httpx.AsyncClient(timeout=N8N_TIMEOUT_SECONDS) as client:
-        with open(pdf_pfad, "rb") as f:
-            pdf_bytes = f.read()
+        pdf_bytes = await lade_pdf_bytes(pdf_pfad)
 
         response = await client.post(
             N8N_WEBHOOK_URL,
@@ -79,6 +96,7 @@ async def ki_extraktion(**kwargs):
                                      ),
         "ki_extraktion_erfolgreich": True,
         "ki_extraktion_zeitstempel": data.get("ki_extraktion_zeitstempel", ""),
+        "anhang_vorhanden":          True,
     }
 
 

@@ -1,0 +1,150 @@
+{
+  "name": "Gmail → Camunda Rechnungseingang",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [{ "mode": "everyMinute" }]
+        },
+        "filters": {
+          "readStatus": "unread",
+          "includeAttachments": true
+        },
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_"
+        }
+      },
+      "id": "node-gmail-trigger",
+      "name": "Gmail – Neue Rechnung",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail DVG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prüfen ob ein PDF-Anhang vorhanden ist\nconst item = $input.first();\n\nconst attachmentKeys = Object.keys(item.binary || {});\nconst pdfKey = attachmentKeys.find(k => {\n  const mime = item.binary[k]?.mimeType || '';\n  const name = item.binary[k]?.fileName || '';\n  return mime === 'application/pdf' || name.toLowerCase().endsWith('.pdf');\n});\n\nif (!pdfKey) {\n  return [{ json: { anhang_vorhanden: false, grund: 'Kein PDF-Anhang gefunden' } }];\n}\n\nconst attachment = item.binary[pdfKey];\nconst absender = item.json?.from || 'unbekannt';\nconst betreff = item.json?.subject || 'Rechnung';\nconst timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);\nconst dateiname = (attachment.fileName || 'rechnung.pdf').replace(/[^a-zA-Z0-9._-]/g, '_');\nconst finaler_dateiname = `${timestamp}_${dateiname}`;\n\nreturn [{\n  json: {\n    anhang_vorhanden: true,\n    pdf_key: pdfKey,\n    dateiname,\n    finaler_dateiname,\n    absender,\n    betreff\n  },\n  binary: item.binary\n}];"
+      },
+      "id": "node-check-attachment",
+      "name": "PDF-Anhang prüfen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "conditions": [
+            {
+              "id": "check-pdf",
+              "leftValue": "={{ $json.anhang_vorhanden }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "node-if-pdf",
+      "name": "Hat PDF?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "name": "={{ $json.finaler_dateiname }}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "eingehende_rechnungen",
+          "cachedResultName": "eingehende_rechnungen"
+        },
+        "inputDataFieldName": "={{ $json.pdf_key }}",
+        "options": {
+          "mimeType": "application/pdf"
+        }
+      },
+      "id": "node-drive-upload",
+      "name": "PDF zu Google Drive hochladen",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [920, 180],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "name": "Google Drive DVG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Google Drive Link und File-ID aus der Upload-Antwort extrahieren\nconst item = $input.first();\nconst fileId = item.json?.id;\nconst fileName = item.json?.name;\n\nif (!fileId) throw new Error('Google Drive Upload fehlgeschlagen – keine File-ID erhalten');\n\nconst driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;\n\nconsole.log(`[Gmail-Workflow] PDF in Google Drive: ${fileName} (${fileId})`);\n\nreturn [{\n  json: {\n    drive_file_id: fileId,\n    drive_url: driveUrl,\n    dateiname: fileName,\n    absender: $('PDF-Anhang prüfen').item.json.absender,\n    betreff: $('PDF-Anhang prüfen').item.json.betreff\n  }\n}];"
+      },
+      "id": "node-extract-drive-info",
+      "name": "Drive-Link aufbereiten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1160, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8081/starte-prozess",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({\n  drive_url: $json.drive_url,\n  dateiname: $json.dateiname,\n  absender: $json.absender\n}) }}",
+        "options": {}
+      },
+      "id": "node-camunda-message",
+      "name": "Camunda Prozess starten",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconsole.log(`[Gmail-Workflow] E-Mail ohne PDF ignoriert: ${item.json.grund}`);\nreturn [{ json: { status: 'ignoriert', ...item.json } }];"
+      },
+      "id": "node-no-pdf",
+      "name": "Kein PDF – ignorieren",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 420]
+    }
+  ],
+  "connections": {
+    "Gmail – Neue Rechnung": {
+      "main": [[{ "node": "PDF-Anhang prüfen", "type": "main", "index": 0 }]]
+    },
+    "PDF-Anhang prüfen": {
+      "main": [[{ "node": "Hat PDF?", "type": "main", "index": 0 }]]
+    },
+    "Hat PDF?": {
+      "main": [
+        [{ "node": "PDF zu Google Drive hochladen", "type": "main", "index": 0 }],
+        [{ "node": "Kein PDF – ignorieren", "type": "main", "index": 0 }]
+      ]
+    },
+    "PDF zu Google Drive hochladen": {
+      "main": [[{ "node": "Drive-Link aufbereiten", "type": "main", "index": 0 }]]
+    },
+    "Drive-Link aufbereiten": {
+      "main": [[{ "node": "Camunda Prozess starten", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [{ "name": "DVG Sprint 6" }]
+}

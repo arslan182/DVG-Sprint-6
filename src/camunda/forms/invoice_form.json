@@ -11,6 +11,15 @@
     },
     {
       "type": "textfield",
+      "key": "rechnung_pdf_pfad",
+      "label": "Rechnung (Google Drive Link)",
+      "readonly": true,
+      "validate": {
+        "required": false
+      }
+    },
+    {
+      "type": "textfield",
       "key": "rechnungs_nummer",
       "label": "Rechnungsnummer",
       "validate": {
@@ -82,6 +91,18 @@
       "rows": 6,
       "validate": {
         "required": false
+      }
+    },
+    {
+      "type": "select",
+      "key": "rechnung_genehmigt",
+      "label": "Entscheidung",
+      "values": [
+        { "label": "✓ Rechnung genehmigen", "value": true },
+        { "label": "✗ Rechnung ablehnen", "value": false }
+      ],
+      "validate": {
+        "required": true
       }
     }
   ]

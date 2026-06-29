@@ -1,8 +1,2 @@
 [Payment Worker] Cluster: 487e2664-45fe-4a21-9e53-860eddc37e5e
 [Payment Worker] Wartet auf Jobs...
-[Payment Worker] Zahlung fuer: RE-2026-00099
-[Payment Worker] Auftrag gesendet: RE-2026-00099
-[Payment Worker] Zahlung fuer: RE-2026-00099
-[Payment Worker] Fehler: Stream connection lost: ConnectionAbortedError(10053, 'Eine bestehende Verbindung wurde softwaregesteuert\r\ndurch den Hostcomputer abgebrochen', None, 10053, None)
-Task type: initiate-payment - failed job Job(key=6755399508777121, type='initiate-payment', process_instance_key=6755399508775950, bpmn_process_id='Process_workflow_sprint6', process_definition_version=1, process_definition_key=2251799875133034, element_id='Activity_0u31h87', element_instance_key=6755399508777120, custom_headers=mappingproxy({}), worker='swa', retries=0, deadline=1782668084427, variables=mappingproxy({'betrag': 8300.25, 'waehrung': 'EUR', 'rechnungs_nummer': 'RE-2026-00099'}), tenant_id='<default>', status=<JobStatus.Running: 'Running'>). Error: RabbitMQ nicht erreichbar: Stream connection lost: ConnectionAbortedError(10053, 'Eine bestehende Verbindung wurde softwaregesteuert\r\ndurch den Hostcomputer abgebrochen', None, 10053, None).
-Failed to activate jobs from the gateway. Exception: ZeebeGatewayUnavailableError(grpc_error=AioRpcError(code=StatusCode.UNAVAILABLE, details=Received http2 header with status: 502, debug_error_string=UNAVAILABLE:Received http2 header with status: 502)). Retrying in 5 seconds...
