@@ -1,2 +1,9 @@
 [Payment Worker] Cluster: 487e2664-45fe-4a21-9e53-860eddc37e5e
 [Payment Worker] Wartet auf Jobs...
+[Payment Worker] Zahlung fuer: RE-2026-JPY-001
+[Payment Worker] Auftrag gesendet: RE-2026-JPY-001
+[Payment Worker] Zahlung fuer: RE-2026-12500
+[Payment Worker] Fehler: Stream connection lost: ConnectionAbortedError(10053, 'Eine bestehende Verbindung wurde softwaregesteuert\r\ndurch den Hostcomputer abgebrochen', None, 10053, None)
+Task type: initiate-payment - failed job Job(key=6755399509088435, type='initiate-payment', process_instance_key=6755399509087474, bpmn_process_id='Process_workflow_sprint6', process_definition_version=2, process_definition_key=2251799878198555, element_id='Activity_0u31h87', element_instance_key=6755399509088434, custom_headers=mappingproxy({}), worker='swa', retries=0, deadline=1782740872600, variables=mappingproxy({'betrag': 12500, 'waehrung': 'EUR', 'rechnungs_nummer': 'RE-2026-12500'}), tenant_id='<default>', status=<JobStatus.Running: 'Running'>). Error: RabbitMQ nicht erreichbar: Stream connection lost: ConnectionAbortedError(10053, 'Eine bestehende Verbindung wurde softwaregesteuert\r\ndurch den Hostcomputer abgebrochen', None, 10053, None).
+[Payment Worker] Zahlung fuer: RE-2026-00099
+[Payment Worker] Auftrag gesendet: RE-2026-00099

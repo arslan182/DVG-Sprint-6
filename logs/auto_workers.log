@@ -1,3 +1,47 @@
 [Auto Workers] Cluster: 487e2664-45fe-4a21-9e53-860eddc37e5e
 [Auto Workers] Wartet auf Jobs...
 [rechnung-erfassen] UNBEKANNT via email
+[rechnung-erfassen] UNBEKANNT via email
+[rechnung-erfassen] UNBEKANNT via email
+[rechnung-erfassen] UNBEKANNT via email
+[rechnung-erfassen] UNBEKANNT via email
+[rechnung-erfassen] UNBEKANNT via email
+[uipath-erp-queue] Starte f³r Rechnung RE-2026-JPY-001
+[uipath-erp-queue] Token erhalten
+[uipath-erp-queue] StartJobs: 201 {"@odata.context":"https://cloud.uipath.com/gruppe11dvg/DefaultTenant/orchestrator_/odata/$metadata#Jobs","value":[{"FolderKey":"e465613c-7151-4c9e-9037-633678153cce","Key":"5e556b37-8b05-4563-b8f5-229a7f1d1632","StartTime":null,"EndTime":null,"State":"Pending","SubState":null,"JobPriority":"Normal"
+[uipath-erp-queue] Job gestartet, ID: 695634398
+[uipath-erp-queue] Job Status: Running (Versuch 1/30)
+[uipath-erp-queue] Job Status: Running (Versuch 2/30)
+[uipath-erp-queue] Job Status: Running (Versuch 3/30)
+[uipath-erp-queue] Job Status: Running (Versuch 4/30)
+[uipath-erp-queue] Job Status: Running (Versuch 5/30)
+[uipath-erp-queue] Job Status: Successful (Versuch 6/30)
+[uipath-erp-queue] Bot erfolgreich abgeschlossen.
+[rechnung-archivieren] RE-2026-JPY-001, 850000 EUR
+[rechnung-erfassen] UNBEKANNT via email
+[uipath-erp-queue] Starte f³r Rechnung RE-2026-12500
+[uipath-erp-queue] Token erhalten
+[uipath-erp-queue] StartJobs: 201 {"@odata.context":"https://cloud.uipath.com/gruppe11dvg/DefaultTenant/orchestrator_/odata/$metadata#Jobs","value":[{"FolderKey":"e465613c-7151-4c9e-9037-633678153cce","Key":"89c6f362-9904-4bda-a77e-9e4af5c5e6c7","StartTime":null,"EndTime":null,"State":"Pending","SubState":null,"JobPriority":"Normal"
+[uipath-erp-queue] Job gestartet, ID: 695637806
+[uipath-erp-queue] Job Status: Running (Versuch 1/30)
+[uipath-erp-queue] Job Status: Running (Versuch 2/30)
+[uipath-erp-queue] Job Status: Running (Versuch 3/30)
+[uipath-erp-queue] Job Status: Running (Versuch 4/30)
+[uipath-erp-queue] Job Status: Running (Versuch 5/30)
+[uipath-erp-queue] Job Status: Successful (Versuch 6/30)
+[uipath-erp-queue] Bot erfolgreich abgeschlossen.
+[rechnung-archivieren] RE-2026-12500, 12500 EUR
+[rechnung-erfassen] UNBEKANNT via email
+[uipath-erp-queue] Starte f³r Rechnung RE-2026-00099
+[uipath-erp-queue] Token erhalten
+[uipath-erp-queue] StartJobs: 201 {"@odata.context":"https://cloud.uipath.com/gruppe11dvg/DefaultTenant/orchestrator_/odata/$metadata#Jobs","value":[{"FolderKey":"e465613c-7151-4c9e-9037-633678153cce","Key":"0ae877c4-46a5-49f2-802d-96a7a2a6dbf3","StartTime":null,"EndTime":null,"State":"Pending","SubState":null,"JobPriority":"Normal"
+[uipath-erp-queue] Job gestartet, ID: 695638955
+[uipath-erp-queue] Job Status: Running (Versuch 1/30)
+[uipath-erp-queue] Job Status: Running (Versuch 2/30)
+[uipath-erp-queue] Job Status: Running (Versuch 3/30)
+[uipath-erp-queue] Job Status: Running (Versuch 4/30)
+[uipath-erp-queue] Job Status: Running (Versuch 5/30)
+[uipath-erp-queue] Job Status: Successful (Versuch 6/30)
+[uipath-erp-queue] Bot erfolgreich abgeschlossen.
+[rechnung-archivieren] RE-2026-00099, 8300.25 EUR
+Failed to activate jobs from the gateway. Exception: ZeebeGatewayUnavailableError(grpc_error=AioRpcError(code=StatusCode.UNAVAILABLE, details=Received http2 header with status: 502, debug_error_string=UNAVAILABLE:Received http2 header with status: 502)). Retrying in 5 seconds...
