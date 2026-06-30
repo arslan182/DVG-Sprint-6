@@ -19,16 +19,12 @@ Terminal-Ausgaben der Worker und Server, plus Screenshots aus Camunda, n8n und U
 
 | Datei | Inhalt |
 |-------|--------|
-| `screenshots/n8n_Workflow_Succeeded.png` | n8n — Rechnungsextraktion AI Workflow erfolgreich (Gemini-Extraktion) |
 | `screenshots/n8n_Gmail_Workflow_Published.png` | n8n — Gmail → Camunda Rechnungseingang Workflow (published) |
 | `screenshots/n8n_Extraktion_Workflow_Published.png` | n8n — Rechnungsextraktion AI Workflow (published) |
-| `screenshots/Camunda_Operate_Prozess_Abgeschlossen.png` | Camunda Operate — Prozessinstanz komplett durchgelaufen |
 | `screenshots/Camunda_Operate_Email_Prozess_Komplett_1.png` | Camunda Operate — Email-Eingang: Prozess vollständig abgeschlossen (1) |
 | `screenshots/Camunda_Operate_Email_Prozess_Komplett_2.png` | Camunda Operate — Email-Eingang: Prozess vollständig abgeschlossen (2) |
 | `screenshots/Camunda_Operate_Manuell_Fallback_Komplett.png` | Camunda Operate — Prozess mit manuellem gRPC-Fallback abgeschlossen |
-| `screenshots/Camunda_Operate_Metadaten_Manuell.png` | Camunda Operate — Manueller Fallback: Metadaten manuell speichern (Boundary Error) |
-| `screenshots/Camunda_Operate_Fehlerbehandlung_Manuell.png` | Camunda Operate — Manueller Fallback: Zahlung manuell erfassen (Boundary Error) |
-| `screenshots/UiPath_RPA_Successful.png` | UiPath Orchestrator — RPA Workflow Job Successful (inkl. Rechnungspositionen) |
+| `screenshots/UiPath_Orchestrator_RPA_Erfolgreich.png` | UiPath Orchestrator — RPA Workflow Job Successful (inkl. Rechnungspositionen) |
 | `screenshots/DMN_Compliance_Schwellenwert.png` | Camunda Modeler — DMN Entscheidungstabelle |
 
 > Docker-Logs werden nicht als Datei gespeichert. Mit `docker logs <container-name>` abrufbar.
