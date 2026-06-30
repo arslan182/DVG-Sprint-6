@@ -78,6 +78,8 @@ Dvg-sprint-6/
 │       └── postgres/docker-compose.yml
 ├── docs/
 │   ├── Architekturdiagramm/       # Architekturdiagramme (Sprint 6)
+│   ├── logs/                      # Logs   
+│   └── README.md
 │   └── screenshots/               # Testdokumentation (Prozess-Screenshots)
 ├── tests/
 │   └── test_workers.py
