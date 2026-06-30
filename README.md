@@ -78,9 +78,10 @@ Dvg-sprint-6/
 │       └── postgres/docker-compose.yml
 ├── docs/
 │   ├── Architekturdiagramm/       # Architekturdiagramme (Sprint 6)
-│   ├── logs/                      # Logs   
+│   ├── screenshots/               # Testdokumentation (Prozess-Screenshots)   
+│   └── Dokumentation.md           
+├── logs/                          # Logs   
 │   └── README.md
-│   └── screenshots/               # Testdokumentation (Prozess-Screenshots)
 ├── tests/
 │   └── test_workers.py
 ├── start_process.py               # Prozess starten (PDF-Pfad als Argument)
